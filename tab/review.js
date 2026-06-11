@@ -72,11 +72,12 @@ function renderDrillDown(emails) {
   }
 
   body.innerHTML = currentEmails.map((item) => `
-    <tr>
+    <tr class="clickable-row" data-message-id="${item.id}">
       <td><input type="checkbox" class="email-checkbox" data-id="${item.id}" checked /></td>
       <td>${item.subject}</td>
       <td>${formatDate(item.date)}</td>
       <td>${formatSize(item.size)} KB</td>
+      <td></td>
     </tr>
   `).join('');
 
@@ -89,6 +90,26 @@ function renderDrillDown(emails) {
         updateDeleteFooter();
         document.getElementById('select-all-checkbox').checked = currentEmails.length > 0 && currentEmails.every((item) => item.checked);
       }
+    });
+  });
+
+  body.querySelectorAll('tr[data-message-id]').forEach((row) => {
+    row.addEventListener('click', (event) => {
+      if (event.target.matches('input[type="checkbox"]')) {
+        return;
+      }
+
+      const messageId = Number(row.getAttribute('data-message-id'));
+      if (!Number.isFinite(messageId)) {
+        return;
+      }
+
+      browser.messageDisplay.open({
+        messageId,
+        location: 'tab'
+      }).catch((error) => {
+        console.error('Failed to open message:', error);
+      });
     });
   });
 
