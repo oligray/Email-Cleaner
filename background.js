@@ -1,3 +1,36 @@
+function addMonths(date, months) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function collectAllMessages(queryOptions) {
+  return browser.messages.query({
+    ...queryOptions,
+    returnMessageListId: true,
+    messagesPerPage: 100,
+    autoPaginationTimeout: 1000
+  }).then((result) => {
+    const allMessages = Array.isArray(result.messages) ? result.messages.slice() : [];
+    let nextMessageListId = result.messageListId || null;
+
+    return (function loadNext() {
+      if (!nextMessageListId) {
+        return Promise.resolve(allMessages);
+      }
+
+      return browser.messages.continueList(nextMessageListId).then((nextPage) => {
+        if (Array.isArray(nextPage.messages)) {
+          allMessages.push(...nextPage.messages);
+        }
+
+        nextMessageListId = nextPage && nextPage.messageListId ? nextPage.messageListId : null;
+        return loadNext();
+      });
+    })();
+  });
+}
+
 browser.browserAction.onClicked.addListener(() => {
   browser.tabs.create({
     url: browser.runtime.getURL('tab/review.html')
@@ -13,19 +46,60 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const limit = Number(message.limit) || 100;
     const minCount = Number(message.minCount) || 2;
 
-    getOldestEmails(message.accountId || null, limit)
-      .then((emails) => {
-        sendResponse({
-          success: true,
-          series: detectSeries(emails, minCount)
-        });
+    Promise.all([getCursor(), getWindowSize()])
+      .then(([cursor, windowSize]) => {
+        const baseCursor = cursor || new Date();
+
+        return getOldestEmails(message.accountId || null, 1)
+          .then((oldestEmails) => {
+            const oldestDate = oldestEmails && oldestEmails.length > 0 ? oldestEmails[0].date : null;
+            const effectiveFromDate = cursor || oldestDate || baseCursor;
+            const toDate = addMonths(new Date(effectiveFromDate), windowSize);
+
+            if (!cursor) {
+              return setCursor(new Date(effectiveFromDate)).then(() => ({ effectiveFromDate, toDate }));
+            }
+
+            return { effectiveFromDate, toDate };
+          })
+          .then(({ effectiveFromDate, toDate }) => {
+            return getOldestEmails(message.accountId || null, limit, effectiveFromDate, toDate)
+              .then((emails) => {
+                sendResponse({
+                  success: true,
+                  series: detectSeries(emails, minCount),
+                  fromDate: effectiveFromDate,
+                  toDate
+                });
+              });
+          });
       })
       .catch((error) => {
         console.error('Failed to build series:', error);
-        sendResponse({
-          success: false,
-          error: error && error.message ? error.message : String(error)
-        });
+        sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+      });
+
+    return true;
+  }
+
+  if (message.action === 'advanceCursor') {
+    Promise.all([getCursor(), getWindowSize()])
+      .then(([cursor, windowSize]) => {
+        const currentCursor = cursor || new Date();
+        const direction = message.direction === 'previous' ? -1 : 1;
+        const nextCursor = addMonths(new Date(currentCursor), direction * windowSize);
+        const toDate = addMonths(new Date(nextCursor), windowSize);
+
+        return setCursor(nextCursor).then(() => ({
+          success: true,
+          fromDate: nextCursor,
+          toDate
+        }));
+      })
+      .then((result) => sendResponse(result))
+      .catch((error) => {
+        console.error('Failed to advance cursor:', error);
+        sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
       });
 
     return true;

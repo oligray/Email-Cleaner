@@ -7,9 +7,11 @@ function normalizeEmailRecord(message) {
   };
 }
 
-function getOldestEmails(accountId, limit = 100) {
+function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null) {
   const queryOptions = {
-    includeSubFolders: false
+    includeSubFolders: false,
+    messagesPerPage: 100,
+    autoPaginationTimeout: 1000
   };
 
   if (accountId) {
@@ -24,12 +26,28 @@ function getOldestEmails(accountId, limit = 100) {
           ? result
           : [];
 
-      const maxResults = Math.max(1, Number(limit) || 100);
+      const fromMs = fromDate ? new Date(fromDate).getTime() : null;
+      const toMs = toDate ? new Date(toDate).getTime() : null;
 
-      return messages
+      const filtered = messages.filter((message) => {
+        const dateMs = new Date(message.date || message.receivedDate || 0).getTime();
+        if (fromMs !== null && dateMs < fromMs) {
+          return false;
+        }
+        if (toMs !== null && dateMs > toMs) {
+          return false;
+        }
+        return true;
+      });
+
+      const ordered = filtered
         .slice()
-        .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
+        .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+
+      const maxResults = Math.max(1, Number(limit) || 100);
+      return ordered
         .slice(0, maxResults)
         .map(normalizeEmailRecord);
     });
 }
+

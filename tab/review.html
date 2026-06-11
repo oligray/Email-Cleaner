@@ -36,7 +36,13 @@
     <p>Review repeated senders from the oldest emails in your inbox.</p>
 
     <section id="series-view">
+      <div class="toolbar">
+        <button id="previous-window-button" type="button">← Previous window</button>
+        <strong id="window-range-label">Reviewing: —</strong>
+        <button id="next-window-button" type="button">Next window →</button>
+      </div>
       <div id="series-status" class="status hidden"></div>
+      <div id="deleted-total-label" class="muted">0 emails deleted this session</div>
       <table>
       <thead>
         <tr>
@@ -65,7 +71,6 @@
             <th>Subject</th>
             <th>Date</th>
             <th>Size (KB)</th>
-            <th>View</th>
           </tr>
         </thead>
         <tbody id="drill-down-body"></tbody>

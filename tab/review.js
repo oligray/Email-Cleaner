@@ -1,6 +1,7 @@
 let currentSeries = [];
 let currentSender = null;
 let currentEmails = [];
+let deletedThisSession = 0;
 
 function formatDate(value) {
   if (!value) {
@@ -93,26 +94,6 @@ function renderDrillDown(emails) {
     });
   });
 
-  body.querySelectorAll('tr[data-message-id]').forEach((row) => {
-    row.addEventListener('click', (event) => {
-      if (event.target.matches('input[type="checkbox"]')) {
-        return;
-      }
-
-      const messageId = Number(row.getAttribute('data-message-id'));
-      if (!Number.isFinite(messageId)) {
-        return;
-      }
-
-      browser.messageDisplay.open({
-        messageId,
-        location: 'tab'
-      }).catch((error) => {
-        console.error('Failed to open message:', error);
-      });
-    });
-  });
-
   document.getElementById('select-all-checkbox').checked = currentEmails.length > 0 && currentEmails.every((item) => item.checked);
   updateDeleteFooter();
 }
@@ -161,6 +142,8 @@ function deleteSelectedEmails() {
   browser.runtime.sendMessage({ action: 'deleteEmails', ids: selected })
     .then((response) => {
       if (response && response.success) {
+        deletedThisSession += selected.length;
+        updateDeletedTotal();
         currentSeries = currentSeries.filter((item) => item.sender !== currentSender);
         renderSeries(currentSeries);
         showSeriesView();
@@ -179,6 +162,14 @@ function deleteSelectedEmails() {
     });
 }
 
+function formatWindowLabel(fromDate, toDate) {
+  return `Reviewing: ${formatDate(fromDate)} – ${formatDate(toDate)}`;
+}
+
+function updateDeletedTotal() {
+  document.getElementById('deleted-total-label').textContent = `${deletedThisSession} emails deleted this session`;
+}
+
 function loadSeries() {
   browser.accounts.list()
     .then((accounts) => {
@@ -193,6 +184,7 @@ function loadSeries() {
     .then((response) => {
       if (response && response.success) {
         renderSeries(response.series || []);
+        document.getElementById('window-range-label').textContent = formatWindowLabel(response.fromDate, response.toDate);
         return;
       }
 
@@ -208,7 +200,17 @@ document.getElementById('back-button').addEventListener('click', () => {
   showSeriesView();
 });
 
-document.getElementById('delete-button').addEventListener('click', deleteSelectedEmails);
+document.getElementById('next-window-button').addEventListener('click', () => {
+  browser.runtime.sendMessage({ action: 'advanceCursor', direction: 'next' }).then(() => loadSeries());
+});
+
+document.getElementById('previous-window-button').addEventListener('click', () => {
+  browser.runtime.sendMessage({ action: 'advanceCursor', direction: 'previous' }).then(() => loadSeries());
+});
+
+document.getElementById('delete-button').addEventListener('click', () => {
+  deleteSelectedEmails();
+});
 
 document.getElementById('select-all-checkbox').addEventListener('change', (event) => {
   currentEmails.forEach((item) => {
@@ -220,4 +222,5 @@ document.getElementById('select-all-checkbox').addEventListener('change', (event
   updateDeleteFooter();
 });
 
+updateDeletedTotal();
 window.addEventListener('load', loadSeries);

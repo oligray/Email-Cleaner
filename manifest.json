@@ -7,12 +7,14 @@
     "messagesDelete",
     "messagesRead",
     "accountsRead",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "background": {
     "scripts": [
       "src/query.js",
       "src/clusterer.js",
+      "src/storage.js",
       "background.js"
     ]
   },
