@@ -4,7 +4,8 @@
   "description": "Minimal Thunderbird WebExtension (Manifest V2) scaffold.",
   "main": "background.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "zip": "node scripts/zip-extension.js"
   },
   "keywords": [],
   "author": "",
