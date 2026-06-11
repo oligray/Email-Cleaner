@@ -12,12 +12,32 @@
       th, td { border: 1px solid #dadce0; padding: 10px; text-align: left; vertical-align: top; }
       th { background: #f1f3f4; }
       .empty { color: #5f6368; font-style: italic; }
+      .hidden { display: none; }
+      .clickable-row { cursor: pointer; }
+      .clickable-row:hover { background: #f8f9fa; }
+      .drill-down { margin-top: 16px; }
+      .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+      .toolbar button { padding: 8px 12px; cursor: pointer; }
+      .footer {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 1px solid #dadce0;
+        padding: 10px 0;
+        margin-top: 12px;
+      }
+      .footer button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .status { color: #188038; margin-top: 8px; }
+      .muted { color: #5f6368; }
     </style>
   </head>
   <body>
     <h1>Email Review</h1>
     <p>Review repeated senders from the oldest emails in your inbox.</p>
-    <table>
+
+    <section id="series-view">
+      <div id="series-status" class="status hidden"></div>
+      <table>
       <thead>
         <tr>
           <th>Sender</th>
@@ -30,7 +50,30 @@
           <td colspan="3" class="empty">Loading series…</td>
         </tr>
       </tbody>
-    </table>
+      </table>
+    </section>
+
+    <section id="drill-down-view" class="drill-down hidden">
+      <div class="toolbar">
+        <button id="back-button" type="button">← Back</button>
+        <strong id="drill-down-title">Sender</strong>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th><input id="select-all-checkbox" type="checkbox" /></th>
+            <th>Subject</th>
+            <th>Date</th>
+            <th>Size (KB)</th>
+          </tr>
+        </thead>
+        <tbody id="drill-down-body"></tbody>
+      </table>
+      <div id="drill-down-status" class="status hidden"></div>
+      <div class="footer">
+        <button id="delete-button" type="button" disabled>Delete 0 emails (0 KB)</button>
+      </div>
+    </section>
 
     <script src="../src/query.js"></script>
     <script src="../src/clusterer.js"></script>
