@@ -6,9 +6,17 @@
   "permissions": [
     "messagesDelete",
     "messagesRead",
-    "accountsRead"
+    "accountsRead",
+    "tabs"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "src/query.js",
+      "src/clusterer.js",
+      "background.js"
+    ]
+  },
+  "browser_action": {
+    "default_title": "Review emails"
   }
 }

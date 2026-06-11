@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Review</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; color: #202124; }
+      h1 { margin-bottom: 8px; }
+      p { color: #5f6368; }
+      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+      th, td { border: 1px solid #dadce0; padding: 10px; text-align: left; vertical-align: top; }
+      th { background: #f1f3f4; }
+      .empty { color: #5f6368; font-style: italic; }
+    </style>
+  </head>
+  <body>
+    <h1>Email Review</h1>
+    <p>Review repeated senders from the oldest emails in your inbox.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Sender</th>
+          <th>Email Count</th>
+          <th>Oldest Date</th>
+        </tr>
+      </thead>
+      <tbody id="results-body">
+        <tr>
+          <td colspan="3" class="empty">Loading series…</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <script src="../src/query.js"></script>
+    <script src="../src/clusterer.js"></script>
+    <script src="review.js"></script>
+  </body>
+</html>
