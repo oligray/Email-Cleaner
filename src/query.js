@@ -3,7 +3,8 @@ function normalizeEmailRecord(message) {
     id: message.id,
     subject: message.subject || '(no subject)',
     author: message.author || message.from || '',
-    date: message.date || message.receivedDate || null
+    date: message.date || message.receivedDate || null,
+    size: Number(message.size) || 0
   };
 }
 

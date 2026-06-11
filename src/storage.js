@@ -26,7 +26,7 @@ function setCursor(date) {
 
 function getWindowSize() {
   return browser.storage.local.get('windowSizeMonths').then((result) => {
-    const value = Number(result && result.windowSizeMonths ? result.windowSizeMonths : 1);
-    return Number.isFinite(value) && value > 0 ? value : 1;
+    const value = Number(result && result.windowSizeMonths ? result.windowSizeMonths : 6);
+    return Number.isFinite(value) && value > 0 ? value : 6;
   });
 }

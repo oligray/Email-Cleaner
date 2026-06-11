@@ -21,7 +21,7 @@ function renderSeries(series) {
   const body = document.getElementById('results-body');
 
   if (currentSeries.length === 0) {
-    body.innerHTML = '<tr><td colspan="3" class="empty">No repeated sender groups found.</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="empty">No repeated sender groups found.</td></tr>';
     return;
   }
 
@@ -29,11 +29,13 @@ function renderSeries(series) {
     const oldestDate = item.emails
       .slice()
       .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))[0]?.date || null;
+    const totalSize = (item.emails || []).reduce((sum, email) => sum + (Number(email.size) || 0), 0);
 
     return `
       <tr class="clickable-row" data-sender="${item.sender}">
         <td>${item.sender}</td>
         <td>${item.count}</td>
+        <td>${formatSize(totalSize / 1024)} KB</td>
         <td>${formatDate(oldestDate)}</td>
       </tr>
     `;
