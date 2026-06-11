@@ -1,0 +1,15 @@
+{
+  "name": "email-cleaner",
+  "version": "1.0.0",
+  "description": "Minimal Thunderbird WebExtension (Manifest V2) scaffold.",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/thunderbird-webext-browser": "^127.0.0"
+  }
+}

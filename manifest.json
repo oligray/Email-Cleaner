@@ -1,0 +1,14 @@
+{
+  "manifest_version": 2,
+  "name": "Email Cleaner",
+  "version": "1.0.0",
+  "description": "Minimal Thunderbird WebExtension to find and optionally delete messages containing 'Security alert'.",
+  "permissions": [
+    "messagesDelete",
+    "messagesRead",
+    "accountsRead"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  }
+}
