@@ -7,27 +7,24 @@ function addMonths(date, months) {
 function collectAllMessages(queryOptions) {
   return browser.messages.query({
     ...queryOptions,
-    returnMessageListId: true,
     messagesPerPage: 100,
     autoPaginationTimeout: 1000
-  }).then((result) => {
-    const allMessages = Array.isArray(result.messages) ? result.messages.slice() : [];
-    let nextMessageListId = result.messageListId || null;
+  }).then((page) => {
+    const allMessages = Array.isArray(page.messages) ? page.messages.slice() : [];
 
-    return (function loadNext() {
-      if (!nextMessageListId) {
+    return (function loadNext(listId) {
+      if (!listId) {
         return Promise.resolve(allMessages);
       }
 
-      return browser.messages.continueList(nextMessageListId).then((nextPage) => {
+      return browser.messages.continueList(listId).then((nextPage) => {
         if (Array.isArray(nextPage.messages)) {
           allMessages.push(...nextPage.messages);
         }
 
-        nextMessageListId = nextPage && nextPage.messageListId ? nextPage.messageListId : null;
-        return loadNext();
+        return loadNext(nextPage.id || null);
       });
-    })();
+    })(page.id || null);
   });
 }
 
@@ -106,31 +103,29 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'getEmailsBySender') {
-    const accountId = message.accountId || null;
     const sender = (message.sender || '').toString().trim().toLowerCase();
-
-    const queryOptions = {
-      includeSubFolders: false
-    };
-
-    if (accountId) {
-      queryOptions.folderId = `${accountId}://INBOX`;
-    }
-
     const normalizedSender = sender.replace(/[<>]/g, '').trim();
 
-    if (normalizedSender) {
-      queryOptions.author = normalizedSender;
-    }
-
-    browser.messages.query(queryOptions)
-      .then((result) => {
-        const items = result && Array.isArray(result.messages)
-          ? result.messages
-          : Array.isArray(result)
-            ? result
-            : [];
-
+    browser.folders.query({ specialUse: ['inbox'] })
+      .then((inboxFolders) => {
+        const queries = inboxFolders.map((folder) =>
+          collectAllMessages({
+            folderId: folder.id,
+            includeSubFolders: false,
+            ...(normalizedSender ? { author: normalizedSender } : {})
+          })
+        );
+        return Promise.all(queries).then((results) => {
+          const seen = new Set();
+          return results.flat().filter((item) => {
+            const key = item.headerMessageId || `${item.date}::${item.subject}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        });
+      })
+      .then((items) => {
         const filtered = items
           .filter((item) => {
             const author = (item.author || item.from || '').toString().toLowerCase();

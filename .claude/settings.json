@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:webextension-api.thunderbird.net)"
+    ]
+  }
+}
