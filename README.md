@@ -15,3 +15,5 @@ A Thunderbird WebExtension for cleaning up your inbox by identifying and removin
 3. Click a sender row to see the individual messages.
 4. Click a message to open it in Thunderbird.
 5. Select messages to delete and clean up your inbox.
+
+TODO: auto-unsubscribe for emails in the last week/ month?

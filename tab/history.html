@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Cleaner — History</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; color: #202124; }
+      h1 { margin: 0; }
+      h2 { margin: 24px 0 6px; font-size: 1em; color: #5f6368; font-weight: normal; }
+      .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+      .page-header button { padding: 8px 12px; cursor: pointer; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+      th, td { border: 1px solid #dadce0; padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { background: #f1f3f4; }
+      .empty { color: #5f6368; font-style: italic; }
+      .action-deleted { color: #c5221f; font-weight: bold; }
+      .action-kept { color: #188038; font-weight: bold; }
+      .clickable-row { cursor: pointer; }
+      .clickable-row:hover { background: #f8f9fa; }
+      .detail-row td { background: #fafafa; padding: 8px 12px 8px 32px; }
+      .detail-row.hidden { display: none; }
+      .subject-list { margin: 4px 0 0; padding: 0; list-style: none; font-size: 0.9em; color: #3c4043; }
+      .subject-list li { padding: 2px 0; border-bottom: 1px dotted #e0e0e0; }
+      .subject-list li:last-child { border-bottom: none; }
+      .subject-group-label { font-size: 0.78em; font-weight: bold; color: #5f6368; text-transform: uppercase; letter-spacing: 0.04em; margin: 6px 0 2px; }
+      .footer-bar {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 1px solid #dadce0;
+        padding: 10px 0;
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .footer-bar button { padding: 8px 12px; cursor: pointer; }
+      .footer-totals { font-size: 0.9em; color: #5f6368; }
+      .no-history { color: #5f6368; font-style: italic; margin-top: 24px; }
+    </style>
+  </head>
+  <body>
+    <div class="page-header">
+      <button id="back-button" type="button">← Back</button>
+      <h1>Decision History</h1>
+    </div>
+
+    <div id="history-content"></div>
+
+    <div class="footer-bar">
+      <button id="export-button" type="button">Export log</button>
+      <span id="footer-totals" class="footer-totals"></span>
+    </div>
+
+    <script src="../src/logger.js"></script>
+    <script src="history.js"></script>
+  </body>
+</html>

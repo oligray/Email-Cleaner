@@ -2,6 +2,9 @@ let currentSeries = [];
 let currentDomain = null;
 let currentEmails = [];
 let deletedThisSession = 0;
+let currentWindowFrom = null;
+let currentWindowTo = null;
+let deletedFromCurrentView = false;
 
 function formatDate(value) {
   if (!value) {
@@ -172,6 +175,7 @@ function openDomainView(domain) {
   }
 
   currentDomain = domain;
+  deletedFromCurrentView = false;
   document.getElementById('drill-down-title').textContent = domain;
   showDrillDownView();
   document.getElementById('drill-down-status').classList.add('hidden');
@@ -204,7 +208,10 @@ function openDomainView(domain) {
 }
 
 function deleteSelectedEmails() {
-  const selected = currentEmails.filter((item) => item.checked).map((item) => item.id);
+  const toDelete = currentEmails.filter((item) => item.checked);
+  const toKeep = currentEmails.filter((item) => !item.checked);
+  const selected = toDelete.map((item) => item.id);
+
   if (selected.length === 0) {
     return;
   }
@@ -216,15 +223,39 @@ function deleteSelectedEmails() {
 
   document.getElementById('delete-button').disabled = true;
   browser.runtime.sendMessage({ action: 'deleteEmails', ids: selected })
-    .then((response) => {
+    .then(async (response) => {
       if (response && response.success) {
         const deletedCount = response.deletedCount || selected.length;
         deletedThisSession += selected.length;
         updateDeletedTotal();
 
-        const remaining = currentEmails.filter((item) => !item.checked);
+        const dateWindow = {
+          from: currentWindowFrom ? String(currentWindowFrom) : '',
+          to: currentWindowTo ? String(currentWindowTo) : ''
+        };
 
-        if (remaining.length === 0) {
+        const senderMap = new Map();
+        for (const email of toDelete) {
+          if (!senderMap.has(email.sender)) senderMap.set(email.sender, { deleted: [], kept: [] });
+          senderMap.get(email.sender).deleted.push(email);
+        }
+        for (const email of toKeep) {
+          if (!senderMap.has(email.sender)) senderMap.set(email.sender, { deleted: [], kept: [] });
+          senderMap.get(email.sender).kept.push(email);
+        }
+
+        deletedFromCurrentView = true;
+        try {
+          for (const [sender, { deleted, kept }] of senderMap) {
+            if (deleted.length > 0) {
+              await logDeletion(currentDomain, sender, deleted, kept, dateWindow);
+            }
+          }
+        } catch (logError) {
+          console.error('Failed to log deletion:', logError);
+        }
+
+        if (toKeep.length === 0) {
           currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
           renderSeries(currentSeries);
           showSeriesView();
@@ -233,7 +264,7 @@ function deleteSelectedEmails() {
           seriesStatus.classList.remove('hidden');
           setTimeout(() => seriesStatus.classList.add('hidden'), 2500);
         } else {
-          renderDrillDown(remaining);
+          renderDrillDown(toKeep);
           const drillStatus = document.getElementById('drill-down-status');
           drillStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
           drillStatus.classList.remove('hidden');
@@ -272,6 +303,8 @@ function loadSeries() {
     })
     .then((response) => {
       if (response && response.success) {
+        currentWindowFrom = response.fromDate || null;
+        currentWindowTo = response.toDate || null;
         renderSeries(response.series || []);
         document.getElementById('window-range-label').textContent = formatWindowLabel(response.fromDate, response.toDate);
         return;
@@ -285,8 +318,30 @@ function loadSeries() {
     });
 }
 
-document.getElementById('back-button').addEventListener('click', () => {
+document.getElementById('back-button').addEventListener('click', async () => {
+  if (deletedFromCurrentView && currentDomain && currentEmails.length > 0) {
+    const dateWindow = {
+      from: currentWindowFrom ? String(currentWindowFrom) : '',
+      to: currentWindowTo ? String(currentWindowTo) : ''
+    };
+    const senderMap = new Map();
+    for (const email of currentEmails) {
+      if (!senderMap.has(email.sender)) senderMap.set(email.sender, []);
+      senderMap.get(email.sender).push(email);
+    }
+    try {
+      for (const [sender, emails] of senderMap) {
+        await logKeep(currentDomain, sender, emails, dateWindow);
+      }
+    } catch (logError) {
+      console.error('Failed to log keep:', logError);
+    }
+  }
   showSeriesView();
+});
+
+document.getElementById('history-button').addEventListener('click', () => {
+  browser.tabs.create({ url: browser.runtime.getURL('tab/history.html') });
 });
 
 document.getElementById('next-window-button').addEventListener('click', () => {

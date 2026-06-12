@@ -8,7 +8,8 @@
     "messagesRead",
     "accountsRead",
     "tabs",
-    "storage"
+    "storage",
+    "downloads"
   ],
   "background": {
     "scripts": [

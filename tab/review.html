@@ -18,6 +18,9 @@
       .drill-down { margin-top: 16px; }
       .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
       .toolbar button { padding: 8px 12px; cursor: pointer; }
+      .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+      .page-header h1 { margin: 0; }
+      .page-header button { padding: 8px 12px; cursor: pointer; }
       .footer {
         position: sticky;
         bottom: 0;
@@ -34,7 +37,10 @@
     </style>
   </head>
   <body>
-    <h1>Email Review</h1>
+    <div class="page-header">
+      <h1>Email Review</h1>
+      <button id="history-button" type="button">History</button>
+    </div>
     <p>Review repeated senders from the oldest emails in your inbox.</p>
 
     <section id="series-view">
@@ -87,6 +93,7 @@
 
     <script src="../src/query.js"></script>
     <script src="../src/clusterer.js"></script>
+    <script src="../src/logger.js"></script>
     <script src="review.js"></script>
   </body>
 </html>
