@@ -88,11 +88,18 @@ function renderDrillDown(emails) {
   }, null);
   meta.textContent = newestDate ? `Most recent email: ${newestDate.toLocaleString()}` : '';
 
+  const sixtyDaysAgo = Date.now() - 60 * 24 * 60 * 60 * 1000;
+
   body.innerHTML = currentEmails.map((item, index) => {
-    const isNewGroup = index > 0 && currentEmails[index - 1].sender !== item.sender;
-    const spacerRow = isNewGroup
-      ? `<tr class="sender-spacer"><td><input type="checkbox" class="group-checkbox" data-group-sender="${item.sender}" checked /></td><td colspan="4"></td></tr>`
-      : '';
+    const isFirstInGroup = index === 0 || currentEmails[index - 1].sender !== item.sender;
+    let spacerRow = '';
+    if (isFirstInGroup) {
+      const mostRecentDate = item.date ? new Date(item.date).getTime() : 0;
+      const unsubscribeCell = mostRecentDate >= sixtyDaysAgo
+        ? `<td><button class="unsubscribe-btn" type="button" data-message-id="${item.id}">Unsubscribe</button></td>`
+        : '<td></td>';
+      spacerRow = `<tr class="sender-spacer"><td><input type="checkbox" class="group-checkbox" data-group-sender="${item.sender}" checked /></td><td colspan="3"></td>${unsubscribeCell}</tr>`;
+    }
     return `${spacerRow}
       <tr class="clickable-row" data-message-id="${item.id}">
         <td><input type="checkbox" class="email-checkbox" data-id="${item.id}" checked /></td>
@@ -164,8 +171,60 @@ function renderDrillDown(emails) {
     });
   });
 
+  body.querySelectorAll('.unsubscribe-btn').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openUnsubscribeLink(btn, Number(btn.getAttribute('data-message-id')));
+    });
+  });
+
   document.getElementById('select-all-checkbox').checked = currentEmails.length > 0 && currentEmails.every((item) => item.checked);
   updateDeleteFooter();
+}
+
+function parseMailtoDetails(mailtoUrl) {
+  const withoutScheme = mailtoUrl.slice('mailto:'.length);
+  const [toRaw, queryString] = withoutScheme.split('?');
+  const details = { to: [decodeURIComponent(toRaw)] };
+  if (queryString) {
+    const params = new URLSearchParams(queryString);
+    if (params.get('subject')) details.subject = params.get('subject');
+    if (params.get('body')) details.body = params.get('body');
+  }
+  return details;
+}
+
+function openUnsubscribeLink(button, messageId) {
+  button.disabled = true;
+  browser.messages.getFull(messageId)
+    .then(async (full) => {
+      const headerValues = full.headers && full.headers['list-unsubscribe'];
+      const raw = Array.isArray(headerValues) && headerValues[0] ? headerValues[0] : '';
+      const urls = [...raw.matchAll(/<([^>]+)>/g)].map((m) => m[1]);
+      const httpUrl = urls.find((u) => u.startsWith('https://') || u.startsWith('http://'));
+      const mailtoUrl = urls.find((u) => u.startsWith('mailto:'));
+
+      if (httpUrl) {
+        browser.tabs.create({ url: httpUrl });
+        button.textContent = 'Unsubscribed';
+        return;
+      }
+
+      if (mailtoUrl) {
+        const tab = await browser.compose.beginNew(parseMailtoDetails(mailtoUrl));
+        await browser.compose.sendMessage(tab.id);
+        button.textContent = 'Unsubscribed';
+        return;
+      }
+
+      alert('No unsubscribe link was found in this email\'s headers.');
+      button.disabled = false;
+    })
+    .catch((err) => {
+      console.error('Failed to retrieve unsubscribe link:', err);
+      alert('Unable to retrieve unsubscribe link.');
+      button.disabled = false;
+    });
 }
 
 function openDomainView(domain) {

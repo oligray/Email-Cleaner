@@ -9,7 +9,8 @@
     "accountsRead",
     "tabs",
     "storage",
-    "downloads"
+    "downloads",
+    "compose"
   ],
   "background": {
     "scripts": [
