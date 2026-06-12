@@ -64,6 +64,17 @@ function updateDeleteFooter() {
   button.textContent = `Delete ${selected.length} email${selected.length === 1 ? '' : 's'} (${formatSize(totalSizeBytes)} KB)`;
 }
 
+function openEmailInViewer(messageId) {
+  if (!messageId || !browser.messageDisplay || typeof browser.messageDisplay.open !== 'function') {
+    return Promise.reject(new Error('Message display API is unavailable.'));
+  }
+
+  return browser.messageDisplay.open({
+    messageId: Number(messageId),
+    active: true
+  });
+}
+
 function renderDrillDown(emails) {
   currentEmails = (emails || []).map((item) => ({ ...item, checked: true }));
   const body = document.getElementById('drill-down-body');
@@ -83,6 +94,19 @@ function renderDrillDown(emails) {
       <td></td>
     </tr>
   `).join('');
+
+  body.querySelectorAll('tr[data-message-id]').forEach((row) => {
+    row.addEventListener('click', (event) => {
+      if (event.target && event.target.closest('input[type="checkbox"]')) {
+        return;
+      }
+
+      const id = row.getAttribute('data-message-id');
+      openEmailInViewer(id).catch((error) => {
+        console.error('Failed to open message in Thunderbird:', error);
+      });
+    });
+  });
 
   body.querySelectorAll('.email-checkbox').forEach((checkbox) => {
     checkbox.addEventListener('change', (event) => {
