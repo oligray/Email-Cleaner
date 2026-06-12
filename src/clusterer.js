@@ -9,25 +9,54 @@ function extractSender(email) {
   return author.toLowerCase();
 }
 
+function extractDomain(emailAddress) {
+  const at = emailAddress.lastIndexOf('@');
+  if (at === -1) return emailAddress;
+  const host = emailAddress.slice(at + 1).toLowerCase();
+  const parts = host.split('.');
+  if (parts.length < 2) return host;
+  if (parts[parts.length - 1].length === 2 && parts.length >= 3) {
+    return parts.slice(-3).join('.');
+  }
+  return parts.slice(-2).join('.');
+}
+
 function detectSeries(emails, minCount = 2) {
-  const groups = new Map();
+  const senderGroups = new Map();
 
   (emails || []).forEach((email) => {
     const sender = extractSender(email);
-
-    if (!groups.has(sender)) {
-      groups.set(sender, []);
+    if (!senderGroups.has(sender)) {
+      senderGroups.set(sender, []);
     }
-
-    groups.get(sender).push(email);
+    senderGroups.get(sender).push(email);
   });
 
-  return Array.from(groups.entries())
+  const senderEntries = Array.from(senderGroups.entries())
     .filter(([, groupEmails]) => groupEmails.length >= Math.max(1, Number(minCount) || 2))
     .map(([sender, groupEmails]) => ({
       sender,
       count: groupEmails.length,
       emails: groupEmails
-    }))
-    .sort((a, b) => b.count - a.count || new Date(a.emails[0]?.date || 0) - new Date(b.emails[0]?.date || 0));
+    }));
+
+  const domainGroups = new Map();
+  senderEntries.forEach((entry) => {
+    const domain = extractDomain(entry.sender);
+    if (!domainGroups.has(domain)) {
+      domainGroups.set(domain, []);
+    }
+    domainGroups.get(domain).push(entry);
+  });
+
+  return Array.from(domainGroups.entries())
+    .map(([domain, senders]) => {
+      const totalCount = senders.reduce((sum, s) => sum + s.count, 0);
+      const allDates = senders.flatMap((s) => s.emails.map((e) => e.date || null)).filter(Boolean);
+      const oldestDate = allDates.length > 0
+        ? allDates.reduce((oldest, d) => (new Date(d) < new Date(oldest) ? d : oldest))
+        : null;
+      return { domain, totalCount, oldestDate, senders };
+    })
+    .sort((a, b) => b.totalCount - a.totalCount);
 }

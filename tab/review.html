@@ -29,6 +29,8 @@
       .footer button:disabled { opacity: 0.5; cursor: not-allowed; }
       .status { color: #188038; margin-top: 8px; }
       .muted { color: #5f6368; }
+      .drill-down-meta { margin: 6px 0 4px; font-size: 0.88em; color: #5f6368; }
+      .sender-spacer td { background: #f1f3f4; padding: 3px 6px; border-left: none; border-right: none; }
     </style>
   </head>
   <body>
@@ -46,9 +48,8 @@
       <table>
       <thead>
         <tr>
-          <th>Sender</th>
+          <th>Domain</th>
           <th>Email Count</th>
-          <th>Total Size</th>
           <th>Oldest Date</th>
         </tr>
       </thead>
@@ -65,10 +66,12 @@
         <button id="back-button" type="button">← Back</button>
         <strong id="drill-down-title">Sender</strong>
       </div>
+      <div id="drill-down-meta" class="drill-down-meta"></div>
       <table>
         <thead>
           <tr>
             <th><input id="select-all-checkbox" type="checkbox" /></th>
+            <th>Sender</th>
             <th>Subject</th>
             <th>Date</th>
             <th>Size (KB)</th>

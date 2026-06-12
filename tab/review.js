@@ -1,5 +1,5 @@
 let currentSeries = [];
-let currentSender = null;
+let currentDomain = null;
 let currentEmails = [];
 let deletedThisSession = 0;
 
@@ -21,28 +21,20 @@ function renderSeries(series) {
   const body = document.getElementById('results-body');
 
   if (currentSeries.length === 0) {
-    body.innerHTML = '<tr><td colspan="4" class="empty">No repeated sender groups found.</td></tr>';
+    body.innerHTML = '<tr><td colspan="3" class="empty">No repeated sender groups found.</td></tr>';
     return;
   }
 
-  body.innerHTML = currentSeries.map((item) => {
-    const oldestDate = item.emails
-      .slice()
-      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))[0]?.date || null;
-    const totalSize = (item.emails || []).reduce((sum, email) => sum + (Number(email.size) || 0), 0);
+  body.innerHTML = currentSeries.map((item) => `
+    <tr class="clickable-row" data-domain="${item.domain}">
+      <td>${item.domain}</td>
+      <td>${item.totalCount}</td>
+      <td>${formatDate(item.oldestDate)}</td>
+    </tr>
+  `).join('');
 
-    return `
-      <tr class="clickable-row" data-sender="${item.sender}">
-        <td>${item.sender}</td>
-        <td>${item.count}</td>
-        <td>${formatSize(totalSize / 1024)} KB</td>
-        <td>${formatDate(oldestDate)}</td>
-      </tr>
-    `;
-  }).join('');
-
-  body.querySelectorAll('tr[data-sender]').forEach((row) => {
-    row.addEventListener('click', () => openSenderView(row.getAttribute('data-sender')));
+  body.querySelectorAll('tr[data-domain]').forEach((row) => {
+    row.addEventListener('click', () => openDomainView(row.getAttribute('data-domain')));
   });
 }
 
@@ -78,22 +70,36 @@ function openEmailInViewer(messageId) {
 function renderDrillDown(emails) {
   currentEmails = (emails || []).map((item) => ({ ...item, checked: true }));
   const body = document.getElementById('drill-down-body');
+  const meta = document.getElementById('drill-down-meta');
 
   if (currentEmails.length === 0) {
-    body.innerHTML = '<tr><td colspan="4" class="empty">No emails found for this sender.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="empty">No emails found for this domain.</td></tr>';
+    meta.textContent = '';
     updateDeleteFooter();
     return;
   }
 
-  body.innerHTML = currentEmails.map((item) => `
-    <tr class="clickable-row" data-message-id="${item.id}">
-      <td><input type="checkbox" class="email-checkbox" data-id="${item.id}" checked /></td>
-      <td>${item.subject}</td>
-      <td>${formatDate(item.date)}</td>
-      <td>${formatSize(item.size)} KB</td>
-      <td></td>
-    </tr>
-  `).join('');
+  const newestDate = currentEmails.reduce((latest, item) => {
+    const d = item.date ? new Date(item.date) : null;
+    return d && (!latest || d > latest) ? d : latest;
+  }, null);
+  meta.textContent = newestDate ? `Most recent email: ${newestDate.toLocaleString()}` : '';
+
+  body.innerHTML = currentEmails.map((item, index) => {
+    const isNewGroup = index > 0 && currentEmails[index - 1].sender !== item.sender;
+    const spacerRow = isNewGroup
+      ? `<tr class="sender-spacer"><td><input type="checkbox" class="group-checkbox" data-group-sender="${item.sender}" checked /></td><td colspan="4"></td></tr>`
+      : '';
+    return `${spacerRow}
+      <tr class="clickable-row" data-message-id="${item.id}">
+        <td><input type="checkbox" class="email-checkbox" data-id="${item.id}" checked /></td>
+        <td class="muted">${item.sender || ''}</td>
+        <td>${item.subject}</td>
+        <td>${formatDate(item.date)}</td>
+        <td>${formatSize(item.size)} KB</td>
+      </tr>
+    `;
+  }).join('');
 
   body.querySelectorAll('tr[data-message-id]').forEach((row) => {
     row.addEventListener('click', (event) => {
@@ -116,7 +122,42 @@ function renderDrillDown(emails) {
         email.checked = event.target.checked;
         updateDeleteFooter();
         document.getElementById('select-all-checkbox').checked = currentEmails.length > 0 && currentEmails.every((item) => item.checked);
+
+        body.querySelectorAll('.group-checkbox').forEach((cb) => {
+          if (cb.getAttribute('data-group-sender') === email.sender) {
+            const groupEmails = currentEmails.filter((e) => e.sender === email.sender);
+            const allChecked = groupEmails.every((e) => e.checked);
+            const someChecked = groupEmails.some((e) => e.checked);
+            cb.checked = allChecked;
+            cb.indeterminate = !allChecked && someChecked;
+          }
+        });
       }
+    });
+  });
+
+  body.querySelectorAll('.group-checkbox').forEach((checkbox) => {
+    checkbox.addEventListener('change', (event) => {
+      const groupSender = event.target.getAttribute('data-group-sender');
+      const isChecked = event.target.checked;
+      event.target.indeterminate = false;
+
+      currentEmails.forEach((item) => {
+        if (item.sender === groupSender) {
+          item.checked = isChecked;
+        }
+      });
+
+      body.querySelectorAll('.email-checkbox').forEach((cb) => {
+        const id = Number(cb.getAttribute('data-id'));
+        const email = currentEmails.find((e) => e.id === id);
+        if (email && email.sender === groupSender) {
+          cb.checked = isChecked;
+        }
+      });
+
+      document.getElementById('select-all-checkbox').checked = currentEmails.length > 0 && currentEmails.every((item) => item.checked);
+      updateDeleteFooter();
     });
   });
 
@@ -124,32 +165,41 @@ function renderDrillDown(emails) {
   updateDeleteFooter();
 }
 
-function openSenderView(sender) {
-  const item = currentSeries.find((entry) => entry.sender === sender);
-  if (!item) {
+function openDomainView(domain) {
+  const domainEntry = currentSeries.find((entry) => entry.domain === domain);
+  if (!domainEntry) {
     return;
   }
 
-  currentSender = sender;
-  document.getElementById('drill-down-title').textContent = sender;
+  currentDomain = domain;
+  document.getElementById('drill-down-title').textContent = domain;
   showDrillDownView();
   document.getElementById('drill-down-status').classList.add('hidden');
   document.getElementById('drill-down-status').textContent = '';
 
-  browser.runtime.sendMessage({
-    action: 'getEmailsBySender',
-    sender,
-    accountId: null
-  }).then((response) => {
-    if (response && response.success) {
-      renderDrillDown(response.emails || []);
-      return;
-    }
-
-    throw new Error('Unable to load sender emails.');
+  Promise.all(
+    domainEntry.senders.map((senderEntry) =>
+      browser.runtime.sendMessage({
+        action: 'getEmailsBySender',
+        sender: senderEntry.sender,
+        accountId: null
+      }).then((response) => {
+        if (response && response.success) {
+          return (response.emails || []).map((email) => ({ ...email, sender: senderEntry.sender }));
+        }
+        return [];
+      }).catch(() => [])
+    )
+  ).then((results) => {
+    const allEmails = results.flat().sort((a, b) => {
+      const senderCmp = a.sender.localeCompare(b.sender);
+      if (senderCmp !== 0) return senderCmp;
+      return new Date(b.date || 0) - new Date(a.date || 0);
+    });
+    renderDrillDown(allEmails);
   }).catch((error) => {
-    console.error('Failed to load sender emails:', error);
-    document.getElementById('drill-down-body').innerHTML = '<tr><td colspan="4" class="empty">Unable to load emails for this sender.</td></tr>';
+    console.error('Failed to load domain emails:', error);
+    document.getElementById('drill-down-body').innerHTML = '<tr><td colspan="5" class="empty">Unable to load emails for this domain.</td></tr>';
   });
 }
 
@@ -170,7 +220,7 @@ function deleteSelectedEmails() {
       if (response && response.success) {
         deletedThisSession += selected.length;
         updateDeletedTotal();
-        currentSeries = currentSeries.filter((item) => item.sender !== currentSender);
+        currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
         renderSeries(currentSeries);
         showSeriesView();
         const status = document.getElementById('series-status');
@@ -244,6 +294,10 @@ document.getElementById('select-all-checkbox').addEventListener('change', (event
   });
   document.querySelectorAll('.email-checkbox').forEach((checkbox) => {
     checkbox.checked = event.target.checked;
+  });
+  document.querySelectorAll('.group-checkbox').forEach((checkbox) => {
+    checkbox.checked = event.target.checked;
+    checkbox.indeterminate = false;
   });
   updateDeleteFooter();
 });
