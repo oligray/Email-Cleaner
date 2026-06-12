@@ -117,16 +117,21 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       queryOptions.folderId = `${accountId}://INBOX`;
     }
 
+    const normalizedSender = sender.replace(/[<>]/g, '').trim();
+
+    if (normalizedSender) {
+      queryOptions.author = normalizedSender;
+    }
+
     browser.messages.query(queryOptions)
       .then((result) => {
-        const messages = result && Array.isArray(result.messages)
+        const items = result && Array.isArray(result.messages)
           ? result.messages
           : Array.isArray(result)
             ? result
             : [];
 
-        const normalizedSender = sender.replace(/[<>]/g, '').trim();
-        const filtered = messages
+        const filtered = items
           .filter((item) => {
             const author = (item.author || item.from || '').toString().toLowerCase();
             return author.includes(normalizedSender) || author.replace(/[<>]/g, '').includes(normalizedSender);

@@ -15,13 +15,21 @@ function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null)
     autoPaginationTimeout: 1000
   };
 
+  if (fromDate) {
+    queryOptions.fromDate = fromDate;
+  }
+
+  if (toDate) {
+    queryOptions.toDate = toDate;
+  }
+
   if (accountId) {
     queryOptions.folderId = `${accountId}://INBOX`;
   }
 
   return browser.messages.query(queryOptions)
     .then((result) => {
-      const messages = result && Array.isArray(result.messages)
+      const items = result && Array.isArray(result.messages)
         ? result.messages
         : Array.isArray(result)
           ? result
@@ -30,7 +38,7 @@ function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null)
       const fromMs = fromDate ? new Date(fromDate).getTime() : null;
       const toMs = toDate ? new Date(toDate).getTime() : null;
 
-      const filtered = messages.filter((message) => {
+      const filtered = items.filter((message) => {
         const dateMs = new Date(message.date || message.receivedDate || 0).getTime();
         if (fromMs !== null && dateMs < fromMs) {
           return false;
