@@ -218,15 +218,28 @@ function deleteSelectedEmails() {
   browser.runtime.sendMessage({ action: 'deleteEmails', ids: selected })
     .then((response) => {
       if (response && response.success) {
+        const deletedCount = response.deletedCount || selected.length;
         deletedThisSession += selected.length;
         updateDeletedTotal();
-        currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
-        renderSeries(currentSeries);
-        showSeriesView();
-        const status = document.getElementById('series-status');
-        status.textContent = `Deleted ${response.deletedCount || selected.length} email${(response.deletedCount || selected.length) === 1 ? '' : 's'}.`;
-        status.classList.remove('hidden');
-        setTimeout(() => status.classList.add('hidden'), 2500);
+
+        const remaining = currentEmails.filter((item) => !item.checked);
+
+        if (remaining.length === 0) {
+          currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
+          renderSeries(currentSeries);
+          showSeriesView();
+          const seriesStatus = document.getElementById('series-status');
+          seriesStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
+          seriesStatus.classList.remove('hidden');
+          setTimeout(() => seriesStatus.classList.add('hidden'), 2500);
+        } else {
+          renderDrillDown(remaining);
+          const drillStatus = document.getElementById('drill-down-status');
+          drillStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
+          drillStatus.classList.remove('hidden');
+          setTimeout(() => drillStatus.classList.add('hidden'), 2500);
+        }
+
         return;
       }
 
