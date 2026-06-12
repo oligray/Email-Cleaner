@@ -336,6 +336,11 @@ document.getElementById('back-button').addEventListener('click', async () => {
     } catch (logError) {
       console.error('Failed to log keep:', logError);
     }
+    const domainEntry = currentSeries.find((item) => item.domain === currentDomain);
+    if (domainEntry) {
+      domainEntry.totalCount = currentEmails.length;
+      renderSeries(currentSeries);
+    }
   }
   showSeriesView();
 });
