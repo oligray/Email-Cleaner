@@ -204,6 +204,16 @@ function openUnsubscribeLink(button, messageId) {
       const httpUrl = urls.find((u) => u.startsWith('https://') || u.startsWith('http://'));
       const mailtoUrl = urls.find((u) => u.startsWith('mailto:'));
 
+      const postHeaderValues = full.headers && full.headers['list-unsubscribe-post'];
+      const isOneClick = Array.isArray(postHeaderValues) &&
+        postHeaderValues.some((v) => v.includes('List-Unsubscribe=One-Click'));
+
+      if (httpUrl && isOneClick) {
+        await browser.runtime.sendMessage({ action: 'unsubscribePost', url: httpUrl });
+        button.textContent = 'Unsubscribed';
+        return;
+      }
+
       if (httpUrl) {
         browser.tabs.create({ url: httpUrl });
         button.textContent = 'Unsubscribed';

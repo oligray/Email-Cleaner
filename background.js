@@ -155,6 +155,29 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === 'unsubscribePost') {
+    const url = (message.url || '').toString();
+    if (!url.startsWith('https://') && !url.startsWith('http://')) {
+      sendResponse({ success: false, error: 'Invalid URL' });
+      return true;
+    }
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'List-Unsubscribe=One-Click'
+    })
+      .then(() => {
+        sendResponse({ success: true });
+      })
+      .catch((error) => {
+        console.error('Unsubscribe POST failed:', error);
+        sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+      });
+
+    return true;
+  }
+
   if (message.action === 'deleteEmails') {
     const ids = Array.isArray(message.ids) ? message.ids.filter((id) => Number.isFinite(Number(id))) : [];
 
