@@ -33,6 +33,7 @@ function renderSeries(series) {
     <tr class="clickable-row" data-domain="${item.domain}">
       <td>${item.domain}</td>
       <td>${item.totalCount}</td>
+      <td>${formatSize((item.totalSize || 0) / 1024)} MB</td>
       <td>${formatDate(item.oldestDate)}</td>
     </tr>
   `).join('');
@@ -496,6 +497,7 @@ document.getElementById('back-button').addEventListener('click', async () => {
     const domainEntry = currentSeries.find((item) => item.domain === currentDomain);
     if (domainEntry) {
       domainEntry.totalCount = currentEmails.length;
+      domainEntry.totalSize = currentEmails.reduce((sum, e) => sum + (Number(e.size) || 0), 0);
       renderSeries(currentSeries);
     }
   }

@@ -52,11 +52,12 @@ function detectSeries(emails, minCount = 2) {
   return Array.from(domainGroups.entries())
     .map(([domain, senders]) => {
       const totalCount = senders.reduce((sum, s) => sum + s.count, 0);
+      const totalSize = senders.reduce((sum, s) => sum + s.emails.reduce((s2, e) => s2 + (Number(e.size) || 0), 0), 0);
       const allDates = senders.flatMap((s) => s.emails.map((e) => e.date || null)).filter(Boolean);
       const oldestDate = allDates.length > 0
         ? allDates.reduce((oldest, d) => (new Date(d) < new Date(oldest) ? d : oldest))
         : null;
-      return { domain, totalCount, oldestDate, senders };
+      return { domain, totalCount, totalSize, oldestDate, senders };
     })
     .sort((a, b) => b.totalCount - a.totalCount);
 }
