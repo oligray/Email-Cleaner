@@ -20,7 +20,7 @@ async function logDeletion(domain, sender, deletedEmails, keptEmails, dateWindow
     action: 'deleted',
     deleted_count: deletedEmails.length,
     rescued_count: keptEmails.length,
-    deleted_emails: deletedEmails.map((e) => ({ id: e.id, subject: e.subject, date: e.date })),
+    deleted_emails: deletedEmails.slice(0, 100).map((e) => ({ id: e.id, subject: e.subject, date: e.date })),
     kept_emails: keptEmails.map((e) => ({ id: e.id, subject: e.subject, date: e.date })),
     window: dateWindow,
     timestamp: new Date().toISOString()
