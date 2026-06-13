@@ -11,8 +11,8 @@ function normalizeEmailRecord(message) {
 function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null) {
   const queryOptions = {
     includeSubFolders: false,
-    messagesPerPage: 100,
-    autoPaginationTimeout: 1000
+    messagesPerPage: 250,
+    autoPaginationTimeout: 10000
   };
 
   if (fromDate) {
@@ -53,10 +53,9 @@ function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null)
         .slice()
         .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
 
-      const maxResults = Math.max(1, Number(limit) || 100);
-      return ordered
-        .slice(0, maxResults)
-        .map(normalizeEmailRecord);
+      const maxResults = Number(limit) || 0;
+      const capped = maxResults > 0 ? ordered.slice(0, maxResults) : ordered;
+      return capped.map(normalizeEmailRecord);
     });
 }
 

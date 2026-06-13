@@ -5,6 +5,7 @@ let deletedThisSession = 0;
 let currentWindowFrom = null;
 let currentWindowTo = null;
 let deletedFromCurrentView = false;
+let currentMode = 'windowed';
 
 function formatDate(value) {
   if (!value) {
@@ -39,6 +40,14 @@ function renderSeries(series) {
   body.querySelectorAll('tr[data-domain]').forEach((row) => {
     row.addEventListener('click', () => openDomainView(row.getAttribute('data-domain')));
   });
+}
+
+function updateModeUI() {
+  const isWindowed = currentMode === 'windowed';
+  document.getElementById('previous-window-button').classList.toggle('hidden', !isWindowed);
+  document.getElementById('next-window-button').classList.toggle('hidden', !isWindowed);
+  document.getElementById('window-range-label').classList.toggle('hidden', !isWindowed);
+  document.getElementById('mode-toggle-button').textContent = isWindowed ? 'Full scan' : 'Windowed';
 }
 
 function showSeriesView() {
@@ -360,6 +369,24 @@ function updateDeletedTotal() {
 }
 
 function loadSeries() {
+  document.getElementById('results-body').innerHTML = '<tr><td colspan="3" class="empty">Loading…</td></tr>';
+
+  if (currentMode === 'full') {
+    browser.runtime.sendMessage({ action: 'scanMailbox', minCount: 2 })
+      .then((response) => {
+        if (response && response.success) {
+          renderSeries(response.series || []);
+          return;
+        }
+        throw new Error('No response from background script.');
+      })
+      .catch((error) => {
+        console.error('Failed to scan mailbox:', error);
+        document.getElementById('results-body').innerHTML = '<tr><td colspan="3" class="empty">Unable to scan mailbox.</td></tr>';
+      });
+    return;
+  }
+
   browser.accounts.list()
     .then((accounts) => {
       const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
@@ -418,6 +445,14 @@ document.getElementById('history-button').addEventListener('click', () => {
   browser.tabs.create({ url: browser.runtime.getURL('tab/history.html') });
 });
 
+document.getElementById('mode-toggle-button').addEventListener('click', () => {
+  currentMode = currentMode === 'windowed' ? 'full' : 'windowed';
+  browser.storage.local.set({ scan_mode: currentMode });
+  updateModeUI();
+  showSeriesView();
+  loadSeries();
+});
+
 document.getElementById('next-window-button').addEventListener('click', () => {
   browser.runtime.sendMessage({ action: 'advanceCursor', direction: 'next' }).then(() => loadSeries());
 });
@@ -445,4 +480,10 @@ document.getElementById('select-all-checkbox').addEventListener('change', (event
 });
 
 updateDeletedTotal();
-window.addEventListener('load', loadSeries);
+window.addEventListener('load', () => {
+  browser.storage.local.get('scan_mode').then((result) => {
+    currentMode = result.scan_mode === 'full' ? 'full' : 'windowed';
+    updateModeUI();
+    loadSeries();
+  });
+});
