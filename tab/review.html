@@ -6,7 +6,7 @@
     <title>Email Review</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 24px; color: #202124; }
-      h1 { margin-bottom: 8px; }
+      h1 { margin: 0 0 2px; }
       p { color: #5f6368; }
       table { width: 100%; border-collapse: collapse; margin-top: 16px; }
       th, td { border: 1px solid #dadce0; padding: 10px; text-align: left; vertical-align: top; }
@@ -18,10 +18,10 @@
       .drill-down { margin-top: 16px; }
       .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
       .toolbar button { padding: 8px 12px; cursor: pointer; }
-      .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-      .page-header h1 { margin: 0; }
-      .page-header-actions { display: flex; gap: 8px; }
+      .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+      .page-header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
       .page-header-actions button { padding: 8px 12px; cursor: pointer; }
+      .account-label { font-size: 0.85em; color: #5f6368; display: block; margin-top: 2px; }
       .footer {
         position: sticky;
         bottom: 0;
@@ -41,15 +41,25 @@
   </head>
   <body>
     <div class="page-header">
-      <h1>Email Review</h1>
+      <div>
+        <h1>Email Review</h1>
+        <span id="current-account-label" class="account-label hidden"></span>
+      </div>
       <div class="page-header-actions">
-        <button id="mode-toggle-button" type="button">Full scan</button>
+        <button id="change-account-button" type="button" class="hidden">Change mailbox</button>
+        <button id="mode-toggle-button" type="button" class="hidden">Full scan</button>
         <button id="history-button" type="button">History</button>
       </div>
     </div>
-    <p>Review repeated senders from the oldest emails in your inbox.</p>
 
-    <section id="series-view">
+    <section id="account-picker-view" class="hidden">
+      <p>Select a mailbox to scan:</p>
+      <table>
+        <tbody id="account-list"></tbody>
+      </table>
+    </section>
+
+    <section id="series-view" class="hidden">
       <div class="toolbar">
         <button id="previous-window-button" type="button">← Previous window</button>
         <strong id="window-range-label">Reviewing: —</strong>
@@ -58,19 +68,19 @@
       <div id="series-status" class="status hidden"></div>
       <div id="deleted-total-label" class="muted">0 emails deleted this session</div>
       <table>
-      <thead>
-        <tr>
-          <th>Domain</th>
-          <th>Email Count</th>
-          <th>Total Size</th>
-          <th>Oldest Date</th>
-        </tr>
-      </thead>
-      <tbody id="results-body">
-        <tr>
-          <td colspan="4" class="empty">Loading series…</td>
-        </tr>
-      </tbody>
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Email Count</th>
+            <th>Total Size</th>
+            <th>Oldest Date</th>
+          </tr>
+        </thead>
+        <tbody id="results-body">
+          <tr>
+            <td colspan="4" class="empty">Loading series…</td>
+          </tr>
+        </tbody>
       </table>
     </section>
 

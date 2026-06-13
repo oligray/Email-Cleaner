@@ -6,6 +6,12 @@ let currentWindowFrom = null;
 let currentWindowTo = null;
 let deletedFromCurrentView = false;
 let currentMode = 'windowed';
+let currentAccountId = null;
+let accountCount = 0;
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function formatDate(value) {
   if (!value) {
@@ -25,7 +31,7 @@ function renderSeries(series) {
   const body = document.getElementById('results-body');
 
   if (currentSeries.length === 0) {
-    body.innerHTML = '<tr><td colspan="3" class="empty">No repeated sender groups found.</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="empty">No repeated sender groups found.</td></tr>';
     return;
   }
 
@@ -59,6 +65,55 @@ function showSeriesView() {
 function showDrillDownView() {
   document.getElementById('series-view').classList.add('hidden');
   document.getElementById('drill-down-view').classList.remove('hidden');
+}
+
+function showAccountPickerView() {
+  document.getElementById('account-picker-view').classList.remove('hidden');
+  document.getElementById('series-view').classList.add('hidden');
+  document.getElementById('drill-down-view').classList.add('hidden');
+  document.getElementById('current-account-label').classList.add('hidden');
+  document.getElementById('change-account-button').classList.add('hidden');
+  document.getElementById('mode-toggle-button').classList.add('hidden');
+}
+
+function selectAccount(id, name) {
+  currentAccountId = id;
+  document.getElementById('account-picker-view').classList.add('hidden');
+  document.getElementById('current-account-label').textContent = name;
+  document.getElementById('current-account-label').classList.remove('hidden');
+  if (accountCount > 1) {
+    document.getElementById('change-account-button').classList.remove('hidden');
+  }
+  document.getElementById('mode-toggle-button').classList.remove('hidden');
+  updateModeUI();
+  showSeriesView();
+  loadSeries();
+}
+
+function loadAccounts() {
+  browser.accounts.list()
+    .then((accounts) => {
+      accountCount = accounts.length;
+      if (accounts.length === 1) {
+        selectAccount(accounts[0].id, accounts[0].name);
+        return;
+      }
+      const list = document.getElementById('account-list');
+      list.innerHTML = accounts.map((a) => `
+        <tr class="clickable-row" data-account-id="${escapeHtml(a.id)}" data-account-name="${escapeHtml(a.name)}">
+          <td>${escapeHtml(a.name)}</td>
+        </tr>
+      `).join('');
+      list.querySelectorAll('tr[data-account-id]').forEach((row) => {
+        row.addEventListener('click', () => {
+          selectAccount(row.getAttribute('data-account-id'), row.getAttribute('data-account-name'));
+        });
+      });
+      showAccountPickerView();
+    })
+    .catch((err) => {
+      console.error('Failed to load accounts:', err);
+    });
 }
 
 function updateDeleteFooter() {
@@ -431,10 +486,10 @@ function updateDeletedTotal() {
 }
 
 function loadSeries() {
-  document.getElementById('results-body').innerHTML = '<tr><td colspan="3" class="empty">Loading…</td></tr>';
+  document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
 
   if (currentMode === 'full') {
-    browser.runtime.sendMessage({ action: 'scanMailbox', minCount: 2 })
+    browser.runtime.sendMessage({ action: 'scanMailbox', minCount: 2, accountId: currentAccountId })
       .then((response) => {
         if (response && response.success) {
           renderSeries(response.series || []);
@@ -444,21 +499,17 @@ function loadSeries() {
       })
       .catch((error) => {
         console.error('Failed to scan mailbox:', error);
-        document.getElementById('results-body').innerHTML = '<tr><td colspan="3" class="empty">Unable to scan mailbox.</td></tr>';
+        document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty">Unable to scan mailbox.</td></tr>';
       });
     return;
   }
 
-  browser.accounts.list()
-    .then((accounts) => {
-      const accountId = accounts && accounts.length > 0 ? accounts[0].id : null;
-      return browser.runtime.sendMessage({
-        action: 'getSeries',
-        accountId,
-        limit: 100,
-        minCount: 2
-      });
-    })
+  browser.runtime.sendMessage({
+    action: 'getSeries',
+    accountId: currentAccountId,
+    limit: 100,
+    minCount: 2
+  })
     .then((response) => {
       if (response && response.success) {
         currentWindowFrom = response.fromDate || null;
@@ -472,7 +523,7 @@ function loadSeries() {
     })
     .catch((error) => {
       console.error('Failed to load series:', error);
-      document.getElementById('results-body').innerHTML = '<tr><td colspan="3" class="empty">Unable to load review data.</td></tr>';
+      document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty">Unable to load review data.</td></tr>';
     });
 }
 
@@ -506,6 +557,10 @@ document.getElementById('back-button').addEventListener('click', async () => {
 
 document.getElementById('history-button').addEventListener('click', () => {
   browser.tabs.create({ url: browser.runtime.getURL('tab/history.html') });
+});
+
+document.getElementById('change-account-button').addEventListener('click', () => {
+  showAccountPickerView();
 });
 
 document.getElementById('mode-toggle-button').addEventListener('click', () => {
@@ -546,7 +601,6 @@ updateDeletedTotal();
 window.addEventListener('load', () => {
   browser.storage.local.get('scan_mode').then((result) => {
     currentMode = result.scan_mode === 'full' ? 'full' : 'windowed';
-    updateModeUI();
-    loadSeries();
+    loadAccounts();
   });
 });

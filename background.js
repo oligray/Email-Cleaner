@@ -157,10 +157,14 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'scanMailbox') {
     const minCount = Number(message.minCount) || 2;
+    const filterAccountId = message.accountId || null;
 
     browser.folders.query({ specialUse: ['inbox'] })
       .then((inboxFolders) => {
-        const queries = inboxFolders.map((folder) =>
+        const folders = filterAccountId
+          ? inboxFolders.filter((f) => f.accountId === filterAccountId)
+          : inboxFolders;
+        const queries = folders.map((folder) =>
           collectAllMessages({ folderId: folder.id, includeSubFolders: false })
         );
         return Promise.all(queries).then((results) => {
