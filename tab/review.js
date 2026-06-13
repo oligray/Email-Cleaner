@@ -495,36 +495,40 @@ async function openDomainView(domain) {
 
 const LARGE_DELETE_THRESHOLD = 100;
 
-async function deleteInBackground(ids) {
-  const total = ids.length;
-  const chunkSize = 50;
-  const progressEl = document.getElementById('deletion-progress');
-  const progressText = document.getElementById('deletion-progress-text');
+function showDeletionProgress(total) {
   const progressBar = document.getElementById('deletion-progress-bar');
-
   progressBar.max = total;
   progressBar.value = 0;
-  progressText.textContent = `Deleting 0 / ${total} emails…`;
-  progressEl.classList.remove('hidden');
-
-  let done = 0;
-  for (let i = 0; i < ids.length; i += chunkSize) {
-    const chunk = ids.slice(i, i + chunkSize);
-    await browser.runtime.sendMessage({ action: 'deleteEmails', ids: chunk });
-    done += chunk.length;
-    progressBar.value = done;
-    progressText.textContent = `Deleting ${done} / ${total} emails…`;
-  }
-
-  progressEl.classList.add('hidden');
-  deletedThisSession += total;
-  updateDeletedTotal();
-
-  const seriesStatus = document.getElementById('series-status');
-  seriesStatus.textContent = `Deleted ${total} email${total === 1 ? '' : 's'}.`;
-  seriesStatus.classList.remove('hidden');
-  setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
+  document.getElementById('deletion-progress-text').textContent = `Deleting 0 / ${total} emails…`;
+  document.getElementById('deletion-progress').classList.remove('hidden');
 }
+
+browser.runtime.onMessage.addListener((message) => {
+  if (message.action === 'deletionProgress') {
+    document.getElementById('deletion-progress-bar').value = message.done;
+    document.getElementById('deletion-progress-text').textContent =
+      `Deleting ${message.done} / ${message.total} emails…`;
+    return false;
+  }
+  if (message.action === 'deletionComplete') {
+    document.getElementById('deletion-progress').classList.add('hidden');
+    deletedThisSession += message.total;
+    updateDeletedTotal();
+    const seriesStatus = document.getElementById('series-status');
+    seriesStatus.textContent = `Deleted ${message.total} email${message.total === 1 ? '' : 's'}.`;
+    seriesStatus.classList.remove('hidden');
+    setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
+    return false;
+  }
+  if (message.action === 'deletionError') {
+    document.getElementById('deletion-progress').classList.add('hidden');
+    const seriesStatus = document.getElementById('series-status');
+    seriesStatus.textContent = 'Some emails could not be deleted.';
+    seriesStatus.classList.remove('hidden');
+    setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
+    return false;
+  }
+});
 
 async function deleteSelectedEmails() {
   const toDelete = currentEmails.filter((item) => item.checked);
@@ -574,15 +578,8 @@ async function deleteSelectedEmails() {
     }
     renderSeries(currentSeries);
     showSeriesView();
-
-    deleteInBackground(selected).catch((err) => {
-      console.error('Background deletion failed:', err);
-      document.getElementById('deletion-progress').classList.add('hidden');
-      const seriesStatus = document.getElementById('series-status');
-      seriesStatus.textContent = 'Some emails could not be deleted.';
-      seriesStatus.classList.remove('hidden');
-      setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
-    });
+    showDeletionProgress(selected.length);
+    browser.runtime.sendMessage({ action: 'startBackgroundDeletion', ids: selected });
     return;
   }
 

@@ -28,6 +28,29 @@ function collectAllMessages(queryOptions) {
   });
 }
 
+async function runBackgroundDeletion(ids, tabId) {
+  const chunkSize = 50;
+  const total = ids.length;
+  let done = 0;
+
+  function notify(action, extra) {
+    if (!tabId) return;
+    browser.tabs.sendMessage(tabId, { action, total, done, ...extra }).catch(() => {});
+  }
+
+  try {
+    for (let i = 0; i < total; i += chunkSize) {
+      await browser.messages.delete(ids.slice(i, i + chunkSize));
+      done += Math.min(chunkSize, total - i);
+      notify('deletionProgress');
+    }
+    notify('deletionComplete');
+  } catch (error) {
+    console.error('Background deletion error:', error);
+    notify('deletionError');
+  }
+}
+
 browser.browserAction.onClicked.addListener(() => {
   browser.tabs.create({
     url: browser.runtime.getURL('tab/review.html')
@@ -223,6 +246,14 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
       });
 
+    return true;
+  }
+
+  if (message.action === 'startBackgroundDeletion') {
+    const ids = Array.isArray(message.ids) ? message.ids.filter((id) => Number.isFinite(Number(id))) : [];
+    const tabId = sender && sender.tab && sender.tab.id;
+    sendResponse({ success: true });
+    runBackgroundDeletion(ids, tabId).catch(console.error);
     return true;
   }
 
