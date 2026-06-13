@@ -8,7 +8,7 @@ let deletedFromCurrentView = false;
 let currentMode = 'windowed';
 let currentAccountId = null;
 let accountCount = 0;
-let sortColumn = 'totalCount';
+let sortColumn = 'totalSize';
 let sortDirection = 'desc';
 let loadingInterval = null;
 
