@@ -37,6 +37,8 @@
       .sender-spacer td { background: #f1f3f4; padding: 3px 6px; border-left: none; border-right: none; }
       .unsubscribe-btn { padding: 2px 8px; font-size: 0.82em; cursor: pointer; }
       .unsubscribe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .deletion-progress:not(.hidden) { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+      .deletion-progress progress { flex: 1; height: 10px; }
     </style>
   </head>
   <body>
@@ -67,6 +69,10 @@
       </div>
       <div id="series-status" class="status hidden"></div>
       <div id="deleted-total-label" class="muted">0 emails deleted this session</div>
+      <div id="deletion-progress" class="deletion-progress hidden">
+        <span id="deletion-progress-text">Deleting…</span>
+        <progress id="deletion-progress-bar" value="0" max="100"></progress>
+      </div>
       <table>
         <thead>
           <tr>

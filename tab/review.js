@@ -402,79 +402,128 @@ function openDomainView(domain) {
   });
 }
 
-function deleteSelectedEmails() {
+const LARGE_DELETE_THRESHOLD = 100;
+
+async function deleteInBackground(ids) {
+  const total = ids.length;
+  const chunkSize = 50;
+  const progressEl = document.getElementById('deletion-progress');
+  const progressText = document.getElementById('deletion-progress-text');
+  const progressBar = document.getElementById('deletion-progress-bar');
+
+  progressBar.max = total;
+  progressBar.value = 0;
+  progressText.textContent = `Deleting 0 / ${total} emails…`;
+  progressEl.classList.remove('hidden');
+
+  let done = 0;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    await browser.runtime.sendMessage({ action: 'deleteEmails', ids: chunk });
+    done += chunk.length;
+    progressBar.value = done;
+    progressText.textContent = `Deleting ${done} / ${total} emails…`;
+  }
+
+  progressEl.classList.add('hidden');
+  deletedThisSession += total;
+  updateDeletedTotal();
+
+  const seriesStatus = document.getElementById('series-status');
+  seriesStatus.textContent = `Deleted ${total} email${total === 1 ? '' : 's'}.`;
+  seriesStatus.classList.remove('hidden');
+  setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
+}
+
+async function deleteSelectedEmails() {
   const toDelete = currentEmails.filter((item) => item.checked);
   const toKeep = currentEmails.filter((item) => !item.checked);
   const selected = toDelete.map((item) => item.id);
 
-  if (selected.length === 0) {
-    return;
-  }
+  if (selected.length === 0) return;
 
   const confirmed = window.confirm(`Delete ${selected.length} selected email${selected.length === 1 ? '' : 's'}?`);
-  if (!confirmed) {
+  if (!confirmed) return;
+
+  document.getElementById('delete-button').disabled = true;
+
+  const dateWindow = {
+    from: currentWindowFrom ? String(currentWindowFrom) : '',
+    to: currentWindowTo ? String(currentWindowTo) : ''
+  };
+  const senderMap = new Map();
+  for (const email of toDelete) {
+    if (!senderMap.has(email.sender)) senderMap.set(email.sender, { deleted: [], kept: [] });
+    senderMap.get(email.sender).deleted.push(email);
+  }
+  for (const email of toKeep) {
+    if (!senderMap.has(email.sender)) senderMap.set(email.sender, { deleted: [], kept: [] });
+    senderMap.get(email.sender).kept.push(email);
+  }
+
+  // Large full-group delete: navigate immediately and track progress in background
+  if (toKeep.length === 0 && selected.length >= LARGE_DELETE_THRESHOLD) {
+    deletedFromCurrentView = true;
+    try {
+      for (const [sender, { deleted, kept }] of senderMap) {
+        if (deleted.length > 0) await logDeletion(currentDomain, sender, deleted, kept, dateWindow);
+      }
+    } catch (logError) {
+      console.error('Failed to log deletion:', logError);
+    }
+
+    currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
+    renderSeries(currentSeries);
+    showSeriesView();
+
+    deleteInBackground(selected).catch((err) => {
+      console.error('Background deletion failed:', err);
+      document.getElementById('deletion-progress').classList.add('hidden');
+      const seriesStatus = document.getElementById('series-status');
+      seriesStatus.textContent = 'Some emails could not be deleted.';
+      seriesStatus.classList.remove('hidden');
+      setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
+    });
     return;
   }
 
-  document.getElementById('delete-button').disabled = true;
-  browser.runtime.sendMessage({ action: 'deleteEmails', ids: selected })
-    .then(async (response) => {
-      if (response && response.success) {
-        const deletedCount = response.deletedCount || selected.length;
-        deletedThisSession += selected.length;
-        updateDeletedTotal();
+  // Standard delete: wait inline (small count or partial-group)
+  try {
+    const response = await browser.runtime.sendMessage({ action: 'deleteEmails', ids: selected });
+    if (!response || !response.success) throw new Error('Delete failed.');
 
-        const dateWindow = {
-          from: currentWindowFrom ? String(currentWindowFrom) : '',
-          to: currentWindowTo ? String(currentWindowTo) : ''
-        };
+    const deletedCount = response.deletedCount || selected.length;
+    deletedThisSession += selected.length;
+    updateDeletedTotal();
 
-        const senderMap = new Map();
-        for (const email of toDelete) {
-          if (!senderMap.has(email.sender)) senderMap.set(email.sender, { deleted: [], kept: [] });
-          senderMap.get(email.sender).deleted.push(email);
-        }
-        for (const email of toKeep) {
-          if (!senderMap.has(email.sender)) senderMap.set(email.sender, { deleted: [], kept: [] });
-          senderMap.get(email.sender).kept.push(email);
-        }
-
-        deletedFromCurrentView = true;
-        try {
-          for (const [sender, { deleted, kept }] of senderMap) {
-            if (deleted.length > 0) {
-              await logDeletion(currentDomain, sender, deleted, kept, dateWindow);
-            }
-          }
-        } catch (logError) {
-          console.error('Failed to log deletion:', logError);
-        }
-
-        if (toKeep.length === 0) {
-          currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
-          renderSeries(currentSeries);
-          showSeriesView();
-          const seriesStatus = document.getElementById('series-status');
-          seriesStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
-          seriesStatus.classList.remove('hidden');
-          setTimeout(() => seriesStatus.classList.add('hidden'), 2500);
-        } else {
-          renderDrillDown(toKeep);
-          const drillStatus = document.getElementById('drill-down-status');
-          drillStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
-          drillStatus.classList.remove('hidden');
-          setTimeout(() => drillStatus.classList.add('hidden'), 2500);
-        }
-
-        return;
+    deletedFromCurrentView = true;
+    try {
+      for (const [sender, { deleted, kept }] of senderMap) {
+        if (deleted.length > 0) await logDeletion(currentDomain, sender, deleted, kept, dateWindow);
       }
+    } catch (logError) {
+      console.error('Failed to log deletion:', logError);
+    }
 
-      throw new Error('Delete failed.');
-    })
-    .catch((error) => {
-      console.error('Failed to delete selected emails:', error);
-      document.getElementById('delete-button').disabled = false;
-    });
+    if (toKeep.length === 0) {
+      currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
+      renderSeries(currentSeries);
+      showSeriesView();
+      const seriesStatus = document.getElementById('series-status');
+      seriesStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
+      seriesStatus.classList.remove('hidden');
+      setTimeout(() => seriesStatus.classList.add('hidden'), 2500);
+    } else {
+      renderDrillDown(toKeep);
+      const drillStatus = document.getElementById('drill-down-status');
+      drillStatus.textContent = `Deleted ${deletedCount} email${deletedCount === 1 ? '' : 's'}.`;
+      drillStatus.classList.remove('hidden');
+      setTimeout(() => drillStatus.classList.add('hidden'), 2500);
+    }
+  } catch (error) {
+    console.error('Failed to delete selected emails:', error);
+    document.getElementById('delete-button').disabled = false;
+  }
 }
 
 function formatWindowLabel(fromDate, toDate) {
