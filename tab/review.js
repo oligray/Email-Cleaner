@@ -10,6 +10,25 @@ let currentAccountId = null;
 let accountCount = 0;
 let sortColumn = 'totalCount';
 let sortDirection = 'desc';
+let loadingInterval = null;
+
+function startLoadingAnimation() {
+  stopLoadingAnimation();
+  let dots = 1;
+  document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty" id="loading-cell">Loading.</td></tr>';
+  loadingInterval = setInterval(() => {
+    dots = dots === 3 ? 1 : dots + 1;
+    const cell = document.getElementById('loading-cell');
+    if (cell) cell.textContent = 'Loading' + '.'.repeat(dots);
+  }, 500);
+}
+
+function stopLoadingAnimation() {
+  if (loadingInterval !== null) {
+    clearInterval(loadingInterval);
+    loadingInterval = null;
+  }
+}
 
 function escapeHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -56,6 +75,7 @@ function updateSortHeaders() {
 }
 
 function renderSeries(series) {
+  stopLoadingAnimation();
   currentSeries = Array.isArray(series) ? series : [];
   const body = document.getElementById('results-body');
   updateSortHeaders();
@@ -394,11 +414,9 @@ function openUnsubscribeLink(button, messageId) {
     });
 }
 
-function openDomainView(domain) {
+async function openDomainView(domain) {
   const domainEntry = currentSeries.find((entry) => entry.domain === domain);
-  if (!domainEntry) {
-    return;
-  }
+  if (!domainEntry) return;
 
   currentDomain = domain;
   deletedFromCurrentView = false;
@@ -407,30 +425,72 @@ function openDomainView(domain) {
   document.getElementById('drill-down-status').classList.add('hidden');
   document.getElementById('drill-down-status').textContent = '';
 
-  Promise.all(
-    domainEntry.senders.map((senderEntry) =>
-      browser.runtime.sendMessage({
-        action: 'getEmailsBySender',
-        sender: senderEntry.sender,
-        accountId: null
-      }).then((response) => {
-        if (response && response.success) {
-          return (response.emails || []).map((email) => ({ ...email, sender: senderEntry.sender }));
+  const totalExpected = domainEntry.totalCount;
+  let fetchedSoFar = 0;
+  const drillBody = document.getElementById('drill-down-body');
+
+  function updateFetchProgress() {
+    drillBody.innerHTML = `<tr><td colspan="5" class="empty">${fetchedSoFar} / ${totalExpected} emails fetched…</td></tr>`;
+  }
+  updateFetchProgress();
+
+  try {
+    const foldersResponse = await browser.runtime.sendMessage({
+      action: 'getInboxFolders',
+      accountId: currentAccountId
+    });
+    const folderIds = foldersResponse && foldersResponse.success ? foldersResponse.folderIds : [];
+
+    const results = await Promise.all(
+      domainEntry.senders.map(async (senderEntry) => {
+        const normalizedSender = senderEntry.sender.replace(/[<>]/g, '').trim().toLowerCase();
+        const senderEmails = [];
+
+        for (const folderId of folderIds) {
+          let page = await browser.messages.query({
+            folderId,
+            includeSubFolders: false,
+            author: normalizedSender,
+            messagesPerPage: 100
+          });
+
+          while (true) {
+            const messages = Array.isArray(page.messages) ? page.messages : [];
+            const matched = messages.filter((m) => {
+              const author = (m.author || m.from || '').toString().toLowerCase();
+              return author.includes(normalizedSender) || author.replace(/[<>]/g, '').includes(normalizedSender);
+            });
+            for (const m of matched) {
+              senderEmails.push({
+                id: m.id,
+                subject: m.subject || '(no subject)',
+                date: m.date || m.receivedDate || null,
+                size: m.size || 0,
+                sender: senderEntry.sender
+              });
+            }
+            fetchedSoFar += matched.length;
+            updateFetchProgress();
+
+            if (!page.id) break;
+            page = await browser.messages.continueList(page.id);
+          }
         }
-        return [];
-      }).catch(() => [])
-    )
-  ).then((results) => {
+
+        return senderEmails;
+      })
+    );
+
     const allEmails = results.flat().sort((a, b) => {
       const senderCmp = a.sender.localeCompare(b.sender);
       if (senderCmp !== 0) return senderCmp;
       return new Date(b.date || 0) - new Date(a.date || 0);
     });
     renderDrillDown(allEmails);
-  }).catch((error) => {
+  } catch (error) {
     console.error('Failed to load domain emails:', error);
-    document.getElementById('drill-down-body').innerHTML = '<tr><td colspan="5" class="empty">Unable to load emails for this domain.</td></tr>';
-  });
+    drillBody.innerHTML = '<tr><td colspan="5" class="empty">Unable to load emails for this domain.</td></tr>';
+  }
 }
 
 const LARGE_DELETE_THRESHOLD = 100;
@@ -574,7 +634,7 @@ function updateDeletedTotal() {
 }
 
 function loadSeries() {
-  document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  startLoadingAnimation();
 
   if (currentMode === 'full') {
     browser.runtime.sendMessage({ action: 'scanMailbox', minCount: 2, accountId: currentAccountId })
@@ -587,6 +647,7 @@ function loadSeries() {
       })
       .catch((error) => {
         console.error('Failed to scan mailbox:', error);
+        stopLoadingAnimation();
         document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty">Unable to scan mailbox.</td></tr>';
       });
     return;
@@ -611,6 +672,7 @@ function loadSeries() {
     })
     .catch((error) => {
       console.error('Failed to load series:', error);
+      stopLoadingAnimation();
       document.getElementById('results-body').innerHTML = '<tr><td colspan="4" class="empty">Unable to load review data.</td></tr>';
     });
 }

@@ -155,6 +155,21 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === 'getInboxFolders') {
+    const filterAccountId = message.accountId || null;
+    browser.folders.query({ specialUse: ['inbox'] })
+      .then((folders) => {
+        const filtered = filterAccountId
+          ? folders.filter((f) => f.accountId === filterAccountId)
+          : folders;
+        sendResponse({ success: true, folderIds: filtered.map((f) => f.id) });
+      })
+      .catch((error) => {
+        sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+      });
+    return true;
+  }
+
   if (message.action === 'scanMailbox') {
     const minCount = Number(message.minCount) || 2;
     const filterAccountId = message.accountId || null;
