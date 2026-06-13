@@ -38,6 +38,8 @@
       .unsubscribe-btn { padding: 2px 8px; font-size: 0.82em; cursor: pointer; }
       .unsubscribe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
       .deletion-progress:not(.hidden) { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+      th[data-sort-col] { cursor: pointer; user-select: none; }
+      th[data-sort-col]:hover { background: #e8eaed; }
       .deletion-progress progress { flex: 1; height: 10px; }
     </style>
   </head>
@@ -77,9 +79,9 @@
         <thead>
           <tr>
             <th>Domain</th>
-            <th>Email Count</th>
-            <th>Total Size</th>
-            <th>Oldest Date</th>
+            <th data-sort-col="totalCount">Email Count ↓</th>
+            <th data-sort-col="totalSize">Total Size</th>
+            <th data-sort-col="oldestDate">Oldest Date</th>
           </tr>
         </thead>
         <tbody id="results-body">

@@ -8,6 +8,8 @@ let deletedFromCurrentView = false;
 let currentMode = 'windowed';
 let currentAccountId = null;
 let accountCount = 0;
+let sortColumn = 'totalCount';
+let sortDirection = 'desc';
 
 function escapeHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -26,16 +28,44 @@ function formatSize(size) {
   return Math.max(0, Math.round((Number(size) || 0) / 1024 * 10) / 10).toFixed(1);
 }
 
+function sortedSeries() {
+  return currentSeries.slice().sort((a, b) => {
+    let aVal, bVal;
+    if (sortColumn === 'totalSize') {
+      aVal = a.totalSize || 0;
+      bVal = b.totalSize || 0;
+    } else if (sortColumn === 'oldestDate') {
+      aVal = a.oldestDate ? new Date(a.oldestDate).getTime() : 0;
+      bVal = b.oldestDate ? new Date(b.oldestDate).getTime() : 0;
+    } else {
+      aVal = a.totalCount || 0;
+      bVal = b.totalCount || 0;
+    }
+    return sortDirection === 'desc' ? bVal - aVal : aVal - bVal;
+  });
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('th[data-sort-col]').forEach((th) => {
+    const col = th.getAttribute('data-sort-col');
+    const labels = { totalCount: 'Email Count', totalSize: 'Total Size', oldestDate: 'Oldest Date' };
+    th.textContent = col === sortColumn
+      ? `${labels[col]} ${sortDirection === 'desc' ? '↓' : '↑'}`
+      : labels[col];
+  });
+}
+
 function renderSeries(series) {
   currentSeries = Array.isArray(series) ? series : [];
   const body = document.getElementById('results-body');
+  updateSortHeaders();
 
   if (currentSeries.length === 0) {
     body.innerHTML = '<tr><td colspan="4" class="empty">No repeated sender groups found.</td></tr>';
     return;
   }
 
-  body.innerHTML = currentSeries.map((item) => `
+  body.innerHTML = sortedSeries().map((item) => `
     <tr class="clickable-row" data-domain="${item.domain}">
       <td>${item.domain}</td>
       <td>${item.totalCount}</td>
@@ -60,6 +90,7 @@ function updateModeUI() {
 function showSeriesView() {
   document.getElementById('series-view').classList.remove('hidden');
   document.getElementById('drill-down-view').classList.add('hidden');
+  window.scrollTo(0, 0);
 }
 
 function showDrillDownView() {
@@ -461,8 +492,8 @@ async function deleteSelectedEmails() {
     senderMap.get(email.sender).kept.push(email);
   }
 
-  // Large full-group delete: navigate immediately and track progress in background
-  if (toKeep.length === 0 && selected.length >= LARGE_DELETE_THRESHOLD) {
+  // Large delete (>= threshold): navigate back immediately and track progress in background
+  if (selected.length >= LARGE_DELETE_THRESHOLD) {
     deletedFromCurrentView = true;
     try {
       for (const [sender, { deleted, kept }] of senderMap) {
@@ -472,7 +503,15 @@ async function deleteSelectedEmails() {
       console.error('Failed to log deletion:', logError);
     }
 
-    currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
+    if (toKeep.length === 0) {
+      currentSeries = currentSeries.filter((item) => item.domain !== currentDomain);
+    } else {
+      const domainEntry = currentSeries.find((item) => item.domain === currentDomain);
+      if (domainEntry) {
+        domainEntry.totalCount = toKeep.length;
+        domainEntry.totalSize = toKeep.reduce((sum, e) => sum + (Number(e.size) || 0), 0);
+      }
+    }
     renderSeries(currentSeries);
     showSeriesView();
 
@@ -610,6 +649,19 @@ document.getElementById('history-button').addEventListener('click', () => {
 
 document.getElementById('change-account-button').addEventListener('click', () => {
   showAccountPickerView();
+});
+
+document.querySelectorAll('th[data-sort-col]').forEach((th) => {
+  th.addEventListener('click', () => {
+    const col = th.getAttribute('data-sort-col');
+    if (sortColumn === col) {
+      sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+    } else {
+      sortColumn = col;
+      sortDirection = 'desc';
+    }
+    renderSeries(currentSeries);
+  });
 });
 
 document.getElementById('mode-toggle-button').addEventListener('click', () => {
