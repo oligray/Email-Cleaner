@@ -182,6 +182,55 @@ function renderDrillDown(emails) {
   updateDeleteFooter();
 }
 
+function walkParts(part, contentType) {
+  if (!part) return null;
+  if (part.contentType && part.contentType.startsWith(contentType) && part.body) {
+    return part.body;
+  }
+  if (Array.isArray(part.parts)) {
+    for (const sub of part.parts) {
+      const found = walkParts(sub, contentType);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function extractUnsubscribeFromBody(full) {
+  const htmlBody = walkParts(full, 'text/html');
+  if (htmlBody) {
+    const doc = new DOMParser().parseFromString(htmlBody, 'text/html');
+    const anchors = Array.from(doc.querySelectorAll('a[href]'));
+    const candidates = anchors.filter((a) => {
+      const text = (a.textContent || '').toLowerCase();
+      const href = (a.getAttribute('href') || '').toLowerCase();
+      return text.includes('unsubscribe') || href.includes('unsubscribe');
+    });
+    // Prefer anchors where visible text says "unsubscribe"; take last occurrence (footer)
+    const textMatches = candidates.filter((a) => (a.textContent || '').toLowerCase().includes('unsubscribe'));
+    const best = textMatches.length > 0 ? textMatches[textMatches.length - 1] : candidates[candidates.length - 1];
+    if (best) {
+      const href = best.getAttribute('href') || '';
+      if (href.startsWith('https://') || href.startsWith('http://') || href.startsWith('mailto:')) {
+        return href;
+      }
+    }
+  }
+
+  const textBody = walkParts(full, 'text/plain');
+  if (textBody) {
+    const lower = textBody.toLowerCase();
+    const idx = lower.lastIndexOf('unsubscribe');
+    if (idx !== -1) {
+      const context = textBody.slice(Math.max(0, idx - 20), idx + 500);
+      const urlMatch = context.match(/https?:\/\/[^\s)>\]"]+/);
+      if (urlMatch) return urlMatch[0];
+    }
+  }
+
+  return null;
+}
+
 function parseMailtoDetails(mailtoUrl) {
   const withoutScheme = mailtoUrl.slice('mailto:'.length);
   const [toRaw, queryString] = withoutScheme.split('?');
@@ -227,7 +276,19 @@ function openUnsubscribeLink(button, messageId) {
         return;
       }
 
-      alert('No unsubscribe link was found in this email\'s headers.');
+      const bodyUrl = extractUnsubscribeFromBody(full);
+      if (bodyUrl) {
+        if (bodyUrl.startsWith('mailto:')) {
+          const tab = await browser.compose.beginNew(parseMailtoDetails(bodyUrl));
+          await browser.compose.sendMessage(tab.id);
+        } else {
+          browser.tabs.create({ url: bodyUrl });
+        }
+        button.textContent = 'Unsubscribed';
+        return;
+      }
+
+      alert('No unsubscribe link was found in this email\'s headers or body.');
       button.disabled = false;
     })
     .catch((err) => {
