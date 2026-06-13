@@ -7,8 +7,8 @@ function addMonths(date, months) {
 function collectAllMessages(queryOptions) {
   return browser.messages.query({
     ...queryOptions,
-    messagesPerPage: 100,
-    autoPaginationTimeout: 1000
+    messagesPerPage: 250,
+    autoPaginationTimeout: 10000
   }).then((page) => {
     const allMessages = Array.isArray(page.messages) ? page.messages.slice() : [];
 
@@ -150,6 +150,35 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           success: false,
           error: error && error.message ? error.message : String(error)
         });
+      });
+
+    return true;
+  }
+
+  if (message.action === 'scanMailbox') {
+    const minCount = Number(message.minCount) || 2;
+
+    browser.folders.query({ specialUse: ['inbox'] })
+      .then((inboxFolders) => {
+        const queries = inboxFolders.map((folder) =>
+          collectAllMessages({ folderId: folder.id, includeSubFolders: false })
+        );
+        return Promise.all(queries).then((results) => {
+          const seen = new Set();
+          return results.flat().filter((item) => {
+            const key = item.headerMessageId || `${item.date}::${item.subject}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }).map(normalizeEmailRecord);
+        });
+      })
+      .then((emails) => {
+        sendResponse({ success: true, series: detectSeries(emails, minCount) });
+      })
+      .catch((error) => {
+        console.error('Failed to scan mailbox:', error);
+        sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
       });
 
     return true;
