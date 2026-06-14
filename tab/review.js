@@ -7,10 +7,13 @@ let currentWindowTo = null;
 let deletedFromCurrentView = false;
 let currentMode = 'windowed';
 let currentAccountId = null;
+let currentAccountName = null;
+let currentFolderId = null;
 let accountCount = 0;
 let sortColumn = 'totalSize';
 let sortDirection = 'desc';
 let loadingInterval = null;
+let deletionInProgress = false;
 
 function startLoadingAnimation() {
   stopLoadingAnimation();
@@ -109,6 +112,8 @@ function updateModeUI() {
 
 function showSeriesView() {
   document.getElementById('series-view').classList.remove('hidden');
+  document.getElementById('account-picker-view').classList.add('hidden');
+  document.getElementById('folder-picker-view').classList.add('hidden');
   document.getElementById('drill-down-view').classList.add('hidden');
   window.scrollTo(0, 0);
 }
@@ -120,6 +125,17 @@ function showDrillDownView() {
 
 function showAccountPickerView() {
   document.getElementById('account-picker-view').classList.remove('hidden');
+  document.getElementById('folder-picker-view').classList.add('hidden');
+  document.getElementById('series-view').classList.add('hidden');
+  document.getElementById('drill-down-view').classList.add('hidden');
+  document.getElementById('current-account-label').classList.add('hidden');
+  document.getElementById('change-account-button').classList.add('hidden');
+  document.getElementById('mode-toggle-button').classList.add('hidden');
+}
+
+function showFolderPickerView() {
+  document.getElementById('folder-picker-view').classList.remove('hidden');
+  document.getElementById('account-picker-view').classList.add('hidden');
   document.getElementById('series-view').classList.add('hidden');
   document.getElementById('drill-down-view').classList.add('hidden');
   document.getElementById('current-account-label').classList.add('hidden');
@@ -129,12 +145,51 @@ function showAccountPickerView() {
 
 function selectAccount(id, name) {
   currentAccountId = id;
+  currentAccountName = name;
   document.getElementById('account-picker-view').classList.add('hidden');
-  document.getElementById('current-account-label').textContent = name;
+  loadFolders(id);
+}
+
+function loadFolders(accountId) {
+  showFolderPickerView();
+  document.getElementById('folder-picker-prompt').textContent = `Select a folder in ${currentAccountName} to scan:`;
+  const list = document.getElementById('folder-list');
+  list.innerHTML = '<tr><td>Loading folders…</td></tr>';
+
+  browser.runtime.sendMessage({ action: 'getFolders', accountId })
+    .then((response) => {
+      if (!response || !response.success) throw new Error('Failed to load folders');
+      const folders = response.folders || [];
+      folders.sort((a, b) => {
+        const aInbox = a.specialUse.includes('inbox');
+        const bInbox = b.specialUse.includes('inbox');
+        if (aInbox && !bInbox) return -1;
+        if (!aInbox && bInbox) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      list.innerHTML = folders.map((f) => `
+        <tr class="clickable-row" data-folder-id="${escapeHtml(f.id)}" data-folder-name="${escapeHtml(f.name)}">
+          <td>${escapeHtml(f.name)}${f.specialUse.includes('inbox') ? ' <span class="muted">(default)</span>' : ''}</td>
+        </tr>
+      `).join('');
+      list.querySelectorAll('tr[data-folder-id]').forEach((row) => {
+        row.addEventListener('click', () => {
+          selectFolder(row.getAttribute('data-folder-id'), row.getAttribute('data-folder-name'));
+        });
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to load folders:', err);
+      list.innerHTML = '<tr><td class="empty">Unable to load folders.</td></tr>';
+    });
+}
+
+function selectFolder(folderId, folderName) {
+  currentFolderId = folderId;
+  document.getElementById('folder-picker-view').classList.add('hidden');
+  document.getElementById('current-account-label').textContent = `${currentAccountName} · ${folderName}`;
   document.getElementById('current-account-label').classList.remove('hidden');
-  if (accountCount > 1) {
-    document.getElementById('change-account-button').classList.remove('hidden');
-  }
+  document.getElementById('change-account-button').classList.remove('hidden');
   document.getElementById('mode-toggle-button').classList.remove('hidden');
   updateModeUI();
   showSeriesView();
@@ -171,8 +226,10 @@ function updateDeleteFooter() {
   const selected = currentEmails.filter((item) => item.checked);
   const totalSizeBytes = selected.reduce((sum, item) => sum + (Number(item.size) || 0), 0);
   const button = document.getElementById('delete-button');
-  button.disabled = selected.length === 0;
-  button.textContent = `Delete ${selected.length} email${selected.length === 1 ? '' : 's'} (${formatSize(totalSizeBytes)} KB)`;
+  button.disabled = selected.length === 0 || deletionInProgress;
+  button.textContent = deletionInProgress
+    ? 'Deletion in progress…'
+    : `Delete ${selected.length} email${selected.length === 1 ? '' : 's'} (${formatSize(totalSizeBytes)} KB)`;
 }
 
 function openEmailInViewer(messageId) {
@@ -437,7 +494,8 @@ async function openDomainView(domain) {
   try {
     const foldersResponse = await browser.runtime.sendMessage({
       action: 'getInboxFolders',
-      accountId: currentAccountId
+      accountId: currentAccountId,
+      folderId: currentFolderId
     });
     const folderIds = foldersResponse && foldersResponse.success ? foldersResponse.folderIds : [];
 
@@ -496,6 +554,7 @@ async function openDomainView(domain) {
 const LARGE_DELETE_THRESHOLD = 100;
 
 function showDeletionProgress(total) {
+  deletionInProgress = true;
   const progressBar = document.getElementById('deletion-progress-bar');
   progressBar.max = total;
   progressBar.value = 0;
@@ -511,9 +570,11 @@ browser.runtime.onMessage.addListener((message) => {
     return false;
   }
   if (message.action === 'deletionComplete') {
+    deletionInProgress = false;
     document.getElementById('deletion-progress').classList.add('hidden');
     deletedThisSession += message.total;
     updateDeletedTotal();
+    updateDeleteFooter();
     const seriesStatus = document.getElementById('series-status');
     seriesStatus.textContent = `Deleted ${message.total} email${message.total === 1 ? '' : 's'}.`;
     seriesStatus.classList.remove('hidden');
@@ -521,7 +582,9 @@ browser.runtime.onMessage.addListener((message) => {
     return false;
   }
   if (message.action === 'deletionError') {
+    deletionInProgress = false;
     document.getElementById('deletion-progress').classList.add('hidden');
+    updateDeleteFooter();
     const seriesStatus = document.getElementById('series-status');
     seriesStatus.textContent = 'Some emails could not be deleted.';
     seriesStatus.classList.remove('hidden');
@@ -558,6 +621,13 @@ async function deleteSelectedEmails() {
 
   // Large delete (>= threshold): navigate back immediately and track progress in background
   if (selected.length >= LARGE_DELETE_THRESHOLD) {
+    if (deletionInProgress) {
+      alert('A deletion is already in progress. Please wait for it to complete.');
+      document.getElementById('delete-button').disabled = false;
+      return;
+    }
+    deletionInProgress = true;
+
     deletedFromCurrentView = true;
     try {
       for (const [sender, { deleted, kept }] of senderMap) {
@@ -578,8 +648,17 @@ async function deleteSelectedEmails() {
     }
     renderSeries(currentSeries);
     showSeriesView();
+
+    const bgResponse = await browser.runtime.sendMessage({ action: 'startBackgroundDeletion', ids: selected });
+    if (!bgResponse || !bgResponse.success) {
+      deletionInProgress = false;
+      const seriesStatus = document.getElementById('series-status');
+      seriesStatus.textContent = bgResponse && bgResponse.error ? bgResponse.error : 'Could not start deletion.';
+      seriesStatus.classList.remove('hidden');
+      setTimeout(() => seriesStatus.classList.add('hidden'), 4000);
+      return;
+    }
     showDeletionProgress(selected.length);
-    browser.runtime.sendMessage({ action: 'startBackgroundDeletion', ids: selected });
     return;
   }
 
@@ -634,7 +713,7 @@ function loadSeries() {
   startLoadingAnimation();
 
   if (currentMode === 'full') {
-    browser.runtime.sendMessage({ action: 'scanMailbox', minCount: 2, accountId: currentAccountId })
+    browser.runtime.sendMessage({ action: 'scanMailbox', minCount: 2, accountId: currentAccountId, folderId: currentFolderId })
       .then((response) => {
         if (response && response.success) {
           renderSeries(response.series || []);
@@ -653,6 +732,7 @@ function loadSeries() {
   browser.runtime.sendMessage({
     action: 'getSeries',
     accountId: currentAccountId,
+    folderId: currentFolderId,
     limit: 100,
     minCount: 2
   })
@@ -707,7 +787,11 @@ document.getElementById('history-button').addEventListener('click', () => {
 });
 
 document.getElementById('change-account-button').addEventListener('click', () => {
-  showAccountPickerView();
+  if (accountCount > 1) {
+    showAccountPickerView();
+  } else {
+    loadFolders(currentAccountId);
+  }
 });
 
 document.querySelectorAll('th[data-sort-col]').forEach((th) => {

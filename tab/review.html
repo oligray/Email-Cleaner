@@ -56,10 +56,22 @@
       </div>
     </div>
 
+    <div id="deletion-progress" class="deletion-progress hidden">
+      <span id="deletion-progress-text">Deleting…</span>
+      <progress id="deletion-progress-bar" value="0" max="100"></progress>
+    </div>
+
     <section id="account-picker-view" class="hidden">
       <p>Select a mailbox to scan:</p>
       <table>
         <tbody id="account-list"></tbody>
+      </table>
+    </section>
+
+    <section id="folder-picker-view" class="hidden">
+      <p id="folder-picker-prompt">Select a folder to scan:</p>
+      <table>
+        <tbody id="folder-list"></tbody>
       </table>
     </section>
 
@@ -71,10 +83,6 @@
       </div>
       <div id="series-status" class="status hidden"></div>
       <div id="deleted-total-label" class="muted">0 emails deleted this session</div>
-      <div id="deletion-progress" class="deletion-progress hidden">
-        <span id="deletion-progress-text">Deleting…</span>
-        <progress id="deletion-progress-bar" value="0" max="100"></progress>
-      </div>
       <table>
         <thead>
           <tr>

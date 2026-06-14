@@ -28,6 +28,8 @@ function collectAllMessages(queryOptions) {
   });
 }
 
+let activeDeletionTabId = null;
+
 async function runBackgroundDeletion(ids, tabId) {
   const chunkSize = 50;
   const total = ids.length;
@@ -48,6 +50,8 @@ async function runBackgroundDeletion(ids, tabId) {
   } catch (error) {
     console.error('Background deletion error:', error);
     notify('deletionError');
+  } finally {
+    activeDeletionTabId = null;
   }
 }
 
@@ -65,12 +69,13 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getSeries') {
     const limit = Number(message.limit) || 100;
     const minCount = Number(message.minCount) || 2;
+    const folderId = message.folderId || (message.accountId ? `${message.accountId}://INBOX` : null);
 
     Promise.all([getCursor(), getWindowSize()])
       .then(([cursor, windowSize]) => {
         const baseCursor = cursor || new Date();
 
-        return getOldestEmails(message.accountId || null, 1)
+        return getOldestEmails(folderId, 1)
           .then((oldestEmails) => {
             const oldestDate = oldestEmails && oldestEmails.length > 0 ? oldestEmails[0].date : null;
             const effectiveFromDate = cursor || oldestDate || baseCursor;
@@ -83,7 +88,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return { effectiveFromDate, toDate };
           })
           .then(({ effectiveFromDate, toDate }) => {
-            return getOldestEmails(message.accountId || null, limit, effectiveFromDate, toDate)
+            return getOldestEmails(folderId, limit, effectiveFromDate, toDate)
               .then((emails) => {
                 sendResponse({
                   success: true,
@@ -178,7 +183,42 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === 'getFolders') {
+    const accountId = message.accountId || null;
+    if (!accountId) {
+      sendResponse({ success: false, error: 'accountId required' });
+      return true;
+    }
+    browser.accounts.get(accountId)
+      .then((account) => {
+        function flatten(folders) {
+          const result = [];
+          for (const f of (folders || [])) {
+            result.push({
+              id: f.id,
+              name: f.name,
+              path: f.path || f.name,
+              specialUse: Array.isArray(f.specialUse) ? f.specialUse : []
+            });
+            if (Array.isArray(f.subFolders) && f.subFolders.length > 0) {
+              result.push(...flatten(f.subFolders));
+            }
+          }
+          return result;
+        }
+        sendResponse({ success: true, folders: flatten(account ? account.folders : []) });
+      })
+      .catch((error) => {
+        sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+      });
+    return true;
+  }
+
   if (message.action === 'getInboxFolders') {
+    if (message.folderId) {
+      sendResponse({ success: true, folderIds: [message.folderId] });
+      return true;
+    }
     const filterAccountId = message.accountId || null;
     browser.folders.query({ specialUse: ['inbox'] })
       .then((folders) => {
@@ -195,13 +235,17 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'scanMailbox') {
     const minCount = Number(message.minCount) || 2;
+    const folderId = message.folderId || null;
     const filterAccountId = message.accountId || null;
 
-    browser.folders.query({ specialUse: ['inbox'] })
-      .then((inboxFolders) => {
-        const folders = filterAccountId
-          ? inboxFolders.filter((f) => f.accountId === filterAccountId)
-          : inboxFolders;
+    const folderPromise = folderId
+      ? Promise.resolve([{ id: folderId }])
+      : browser.folders.query({ specialUse: ['inbox'] }).then((folders) =>
+          filterAccountId ? folders.filter((f) => f.accountId === filterAccountId) : folders
+        );
+
+    folderPromise
+      .then((folders) => {
         const queries = folders.map((folder) =>
           collectAllMessages({ folderId: folder.id, includeSubFolders: false })
         );
@@ -250,8 +294,13 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'startBackgroundDeletion') {
+    if (activeDeletionTabId !== null) {
+      sendResponse({ success: false, error: 'A deletion is already in progress.' });
+      return true;
+    }
     const ids = Array.isArray(message.ids) ? message.ids.filter((id) => Number.isFinite(Number(id))) : [];
     const tabId = sender && sender.tab && sender.tab.id;
+    activeDeletionTabId = tabId;
     sendResponse({ success: true });
     runBackgroundDeletion(ids, tabId).catch(console.error);
     return true;

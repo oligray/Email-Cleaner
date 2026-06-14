@@ -8,7 +8,7 @@ function normalizeEmailRecord(message) {
   };
 }
 
-function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null) {
+function getOldestEmails(folderId, limit = 100, fromDate = null, toDate = null) {
   const queryOptions = {
     includeSubFolders: false,
     messagesPerPage: 250,
@@ -23,8 +23,8 @@ function getOldestEmails(accountId, limit = 100, fromDate = null, toDate = null)
     queryOptions.toDate = toDate;
   }
 
-  if (accountId) {
-    queryOptions.folderId = `${accountId}://INBOX`;
+  if (folderId) {
+    queryOptions.folderId = folderId;
   }
 
   return browser.messages.query(queryOptions)
