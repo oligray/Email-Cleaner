@@ -1,6 +1,6 @@
 # Email Cleaner
 
-A Thunderbird WebExtension for cleaning up your email folders by identifying and removing mail from repeat senders in bulk - with the option to unsubscribe.
+A Thunderbird Add-on for cleaning up your email folders by identifying and removing mail from repeat senders in bulk - with the option to unsubscribe.
 
 ## Features
 
@@ -49,7 +49,7 @@ https://ko-fi.com/oligray
 
 ## Development
 
-No build step is required. The extension runs directly in Thunderbird as a WebExtension.
+No build step is required. The extension runs directly in Thunderbird as an Add-on.
 
 To package the extension for distribution, run:
 
