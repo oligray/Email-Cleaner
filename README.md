@@ -31,7 +31,7 @@ When you click into a sender row, the drilldown always shows all messages from t
 * _Alternatively if you wish to update the code, select the `manifest.json` and use **reload** to see any changes you make._
 
 ### User Guide
-* Click the **Review emails** button on the right of the top toolbar — it loads a summary of repeat senders from the last 6 months.
+* Click the **Email Cleaner** button on the right of the top toolbar — it loads a summary of repeat senders from the last 6 months.
 * Optionally click **Full scan** in the toolbar to scan your entire Inbox. **Note:** this has been tested against a 12GB mailbox so far - YMMV!
 * Click a sender row to see all individual messages from that sender.
 * Select/Deselect messages and click **Delete** when you are ready.
