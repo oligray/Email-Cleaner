@@ -22,15 +22,24 @@ In windowed mode you can use the **Previous** and **Next** buttons to shift the 
 
 When you click into a sender row, the drilldown always shows all messages from that sender across your full inbox, regardless of which mode is active.
 
-**History** provides a log of emails deleted/kept this session. The idea was to use this data to further automate the keep/delete process in future. **Note:** you should not rely on this data to persist since it uses local storage and will be lost if the Extension is removed (reload is safe)
-
 ## Usage
 
-1. Install the extension in Thunderbird.
-2. Open the extension — it loads a summary of repeat senders from the last 6 months.
-3. Optionally click **Full scan** in the toolbar to scan your entire inbox instead.
-4. Click a sender row to see all individual messages from that sender.
-5. Select the messages you want to remove and click **Delete**.
+### Install the Add-on
+* Download `cleaner.zip` from the [release](release/) folder.
+* In Thunderbird, go to **Tools > Developer Tools > Debug Add-ons**.
+* Click **Load Temporary Add-on** and select the zip file (for personal usage). 
+* _Alternatively if you wish to update the code, select the `manifest.json` and use **reload** to see any changes you make._
+
+### User Guide
+* Click the **Review emails** button on the right of the top toolbar — it loads a summary of repeat senders from the last 6 months.
+* Optionally click **Full scan** in the toolbar to scan your entire Inbox. **Note:** this has been tested against a 12GB mailbox so far - YMMV!
+* Click a sender row to see all individual messages from that sender.
+* Select/Deselect messages and click **Delete** when you are ready.
+
+#### Optional features
+* Use the **Unsubscribe** button to stop future email from that sender _(uses Unsubscribe info from the newest email in the group)_
+* Clicking on a message will open it in Thunderbird to view the contents
+* **History** provides a log of emails deleted/kept this session. The idea was to use this data to further automate the keep/delete process in future. _Note:_ you should not rely on this data to persist since it uses local storage and will be lost if the Extension is removed (reload is safe)
 
 ## Support
 
@@ -48,4 +57,4 @@ To package the extension for distribution, run:
 npm run zip
 ```
 
-This produces a `.zip` file ready for installation or submission.
+This produces `release/cleaner.zip`.
