@@ -9,7 +9,7 @@ A Thunderbird WebExtension for cleaning up your email folders by identifying and
 - **Message drilldown** — click any sender row to see each individual message from that sender across your entire inbox.
 - **Open in Thunderbird** — click a message in the drilldown view to open it in the native Thunderbird client for review.
 - **Bulk delete** — select messages and remove them in one action.
-- **Unsubscribe** — button provided for emails that were received in the last 60 days
+- **Unsubscribe** — simple one-click (sometimes two!) to unsubscribe when the last email was received < 60 days
 
 
 ## Scan modes
@@ -22,6 +22,8 @@ In windowed mode you can use the **Previous** and **Next** buttons to shift the 
 
 When you click into a sender row, the drilldown always shows all messages from that sender across your full inbox, regardless of which mode is active.
 
+**History** provides a log of emails deleted/kept this session. The idea was to use this data to further automate the keep/delete process in future. **Note:** you should not rely on this data to persist since it uses local storage and will be lost if the Extension is removed (reload is safe)
+
 ## Usage
 
 1. Install the extension in Thunderbird.
@@ -29,6 +31,12 @@ When you click into a sender row, the drilldown always shows all messages from t
 3. Optionally click **Full scan** in the toolbar to scan your entire inbox instead.
 4. Click a sender row to see all individual messages from that sender.
 5. Select the messages you want to remove and click **Delete**.
+
+## Support
+
+If you find this Thunderbird extension useful and would like to buy me a coffee, you can do so on Ko-fi - thank you!
+
+https://ko-fi.com/oligray
 
 ## Development
 
