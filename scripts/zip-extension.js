@@ -3,12 +3,17 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
-const outputFile = path.join(root, 'cleaner.zip');
-const tempOutputFile = path.join(root, 'cleaner.tmp.zip');
+const releaseDir = path.join(root, 'release');
+const outputFile = path.join(releaseDir, 'cleaner.zip');
+const tempOutputFile = path.join(releaseDir, 'cleaner.tmp.zip');
 
-const entriesToInclude = ['manifest.json', 'background.js', 'README.md', 'src', 'tab'];
+const entriesToInclude = ['manifest.json', 'background.js', 'README.md', 'icons', 'src', 'tab'];
 
 function createZip() {
+  if (!fs.existsSync(releaseDir)) {
+    fs.mkdirSync(releaseDir);
+  }
+
   if (fs.existsSync(tempOutputFile)) {
     fs.rmSync(tempOutputFile, { force: true });
   }
