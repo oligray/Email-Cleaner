@@ -2,7 +2,13 @@
   "manifest_version": 2,
   "name": "Email Cleaner",
   "version": "1.0.0",
-  "description": "Minimal Thunderbird WebExtension to find and optionally delete messages containing 'Security alert'.",
+  "description": "Identify and remove emails from repeat senders in bulk, with one-click unsubscribe support.",
+  "author": "Oliver Gray",
+  "homepage_url": "https://github.com/oligray/Email-Cleaner",
+  "icons": {
+    "48": "images/clean-icon-48.png",
+    "96": "images/clean-icon-96.png"
+  },
   "permissions": [
     "messagesDelete",
     "messagesRead",
@@ -12,6 +18,12 @@
     "downloads",
     "compose"
   ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "email-cleaner@oligray",
+      "strict_min_version": "115.0"
+    }
+  },
   "background": {
     "scripts": [
       "src/query.js",
@@ -21,6 +33,10 @@
     ]
   },
   "browser_action": {
-    "default_title": "Review emails"
+    "default_title": "Email Cleaner",
+    "default_icon": {
+      "16": "images/clean-icon-16.png",
+      "32": "images/clean-icon-32.png"
+    }
   }
 }
