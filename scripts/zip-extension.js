@@ -7,7 +7,7 @@ const releaseDir = path.join(root, 'release');
 const outputFile = path.join(releaseDir, 'cleaner.zip');
 const tempOutputFile = path.join(releaseDir, 'cleaner.tmp.zip');
 
-const entriesToInclude = ['manifest.json', 'background.js', 'README.md', 'icons', 'src', 'tab'];
+const entriesToInclude = ['manifest.json', 'background.js', 'README.md', 'images', 'src', 'tab'];
 
 function createZip() {
   if (!fs.existsSync(releaseDir)) {
